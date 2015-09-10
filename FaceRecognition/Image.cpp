@@ -71,7 +71,7 @@ void ExtractImageData(char *image, int width, int height)
 	int cz;
 	int cp;
 	
-	// 非4倍数，位图像素补齐width到4的倍数
+	// 每行像素字节数为非4倍数，用0补齐每行像素字节数到4的倍数
 	if ( !(width*3 % 4) )
 		return ;
 	
@@ -88,7 +88,7 @@ void ExtractImageData(char *image, int width, int height)
 			image[j*width*3+i*3+1] = image[cp++];
 			image[j*width*3+i*3+2] = image[cp++];
 		}
-		// 丢掉cz字节无效的width*3补齐4倍数的0像素数据
+		// 每行丢掉cz个字节的补齐4倍数的无效像素数据
 		for ( i=0; i<cz; i++ )
 			cp++;
 	}
@@ -119,14 +119,17 @@ BOOL ReadBmpFile(LPSTR ImageFileName, char *oImage)
 	// 读取位图文件头
 	_llseek(Image_fp, 0, 0);
 	_lread(Image_fp, &bfImage, sizeof(BITMAPFILEHEADER));
+
+	// "BM" (0x4d42)：表示位图BMP
 	if ((bfImage.bfType != 0x4d42)) 
-	{		// "BM"
+	{
 		MessageBox(NULL, "非bmp文件", "打开bmp文件出错信息", MB_OK);
 		return FALSE;
 	}
 
 	// 读取位图信息头
 	_lread(Image_fp, &biImage, sizeof(BITMAPINFOHEADER));
+
 	if (biImage.biBitCount != 24)
 	{
 		MessageBox(NULL, "非24位真彩色位图", "读取bmp文件出错信息", MB_OK);
