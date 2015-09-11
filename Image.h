@@ -23,7 +23,9 @@ extern char curDir[1024];
 #define IMAGEGAP		40
 
 
-// 
+// 24ä½çœŸå½©è‰²ä½å›¾ç»“æ„å®šä¹‰
+// image[]ï¼šå­˜æ”¾BMPçœŸå®åƒç´ RBGæ•°æ®ï¼Œæœ€å¤§å¯æ”¾ï¼ˆMAX_IMAGE_WIDTH * MAX_IMAGE_HEIGHT * 3ï¼‰å­—èŠ‚
+// width & heightï¼šå­˜æ”¾BMPçœŸå®å°ºå¯¸
 typedef struct _BmpImage
 {
 	char image[MAXIMAGEWIDTH*MAXIMAGEHEIGHT*3];
@@ -35,83 +37,83 @@ typedef struct _BmpImage
 
 /*
 	hWinDC = GetDC(hWnd);
-	OpenImageFile("´ò¿ªÍ¼ÏñÎÄ¼ş");
-	ReadImage(ImgFileName, NewImage, 256, 256);	//¶ÁÍ¼ÏñÏµÊı
-	ShowImage(image, 256, 256, 100, 100);			//ÏÔÊ¾Í¼Ïñ
+	OpenImageFile("æ‰“å¼€å›¾åƒæ–‡ä»¶");
+	ReadImage(ImgFileName, NewImage, 256, 256);	//è¯»å›¾åƒç³»æ•°
+	ShowImage(image, 256, 256, 100, 100);			//æ˜¾ç¤ºå›¾åƒ
 */
 
 
 
-// »ñÈ¡Ñ¡ÔñÎÄ¼şÃû
+// è·å–é€‰æ‹©æ–‡ä»¶å
 void OpenImageFile(char *);
 
-// ¶ÁÈ¡bmpÍ¼ÏñÎÄ¼ş
+// è¯»å–bmpå›¾åƒæ–‡ä»¶
 BOOL ReadBmpFile(LPSTR, char *);
 
-// ÏÔÊ¾bmpÍ¼Ïñ
+// æ˜¾ç¤ºbmpå›¾åƒ
 void ShowBmpImage(char *, int, int, int, int);
 
-// ÏÔÊ¾bmp»Ò¶ÈÍ¼Ïñ
+// æ˜¾ç¤ºbmpç°åº¦å›¾åƒ
 void ShowBmpGreyImage(char *, int, int, int, int t);
 
-// Çå³ıÍ¼ÏñÏÔÊ¾
+// æ¸…é™¤å›¾åƒæ˜¾ç¤º
 void CleanUpShowImage(int, int, int, int);
 
 
 
-// Í¼Ïñ¹éÒ»»¯£¬Ëõ·Åµ½Ö¸¶¨´óĞ¡
+// å›¾åƒå½’ä¸€åŒ–ï¼Œç¼©æ”¾åˆ°æŒ‡å®šå¤§å°
 void NormalizeImageSize(char *, int, int, char *, int, int);
 
-// RGBÉ«²Ê¿Õ¼äÄ£ĞÍ×ª»»µ½YCbCr¿Õ¼äÄ£ĞÍ
+// RGBè‰²å½©ç©ºé—´æ¨¡å‹è½¬æ¢åˆ°YCbCrç©ºé—´æ¨¡å‹
 void RgbToYcbcr(char *, char *, int , int );
 
-// Í¼Æ¬ÅòÕÍ´¦Àí
+// å›¾ç‰‡è†¨èƒ€å¤„ç†
 void Expand(char *, int, int );
 
-// Í¼Æ¬¸¯Ê´´¦Àí
+// å›¾ç‰‡è…èš€å¤„ç†
 void Erode(char *, int, int);
 
-// ¹ıÂËµôĞ¡¿éÈËÁ³ºòÑ¡ÇøÓò±³¾°ÔëÒô
+// è¿‡æ»¤æ‰å°å—äººè„¸å€™é€‰åŒºåŸŸèƒŒæ™¯å™ªéŸ³
 void FilterNoise(char *, int, int);
 
 
 
-// ÌáÈ¡»Ò¶ÈÍ¼ÏñÎÆÀíµÄLBPÌØÕ÷£¬Í³¼ÆLBPÌØÕ÷Ö±·½Í¼±íÕ÷ÈËÁ³
+// æå–ç°åº¦å›¾åƒçº¹ç†çš„LBPç‰¹å¾ï¼Œç»Ÿè®¡LBPç‰¹å¾ç›´æ–¹å›¾è¡¨å¾äººè„¸
 void ExtractImageLbp(char *, int, int, int *);
 
-// ¿¨·½Í³¼ÆÁ½Í¼ÏñLBPÏàËÆ¶È
+// å¡æ–¹ç»Ÿè®¡ä¸¤å›¾åƒLBPç›¸ä¼¼åº¦
 int ChiSquareStatistic(int *, int *, int);
 
-// ²éÕÒÈËÁ³¿âÖĞÊÇ·ñ´æÔÚÄ¿±êÈËÁ³
+// æŸ¥æ‰¾äººè„¸åº“ä¸­æ˜¯å¦å­˜åœ¨ç›®æ ‡äººè„¸
 bool SearchFace(char *, int *);
 
-// Ê¶±ğÈËÁ³£¬¿âÖĞÕÒ³öÄ¿±êÈËÁ³
+// è¯†åˆ«äººè„¸ï¼Œåº“ä¸­æ‰¾å‡ºç›®æ ‡äººè„¸
 bool RecognizeFace(char *, int, int, char *);
 
-// ÕÕÆ¬Â¼ÈëÈËÁ³¿â
+// ç…§ç‰‡å½•å…¥äººè„¸åº“
 bool EnterFace(char *, char *);
 
-// ÒÆ³ıÈËÁ³È¡Ñù
+// ç§»é™¤äººè„¸å–æ ·
 void DeleteFace();
 
 
 
-// µÃµ½ÈËÁ³·ôÉ«cbcr[cb][cr]¶Ô±È¿â
+// å¾—åˆ°äººè„¸è‚¤è‰²cbcr[cb][cr]å¯¹æ¯”åº“
 bool FaceCbcrProc();
 
-// ´¦ÀíFaceSample.bmpÈËÁ³·ôÉ«Ñù±¾¿â
+// å¤„ç†FaceSample.bmpäººè„¸è‚¤è‰²æ ·æœ¬åº“
 void FaceSampleCbcr(char *, int, int);
 
-// ¸ù¾İcb,cr·ôÉ«·¶Î§µÃµ½ÈËÁ³·ôÉ«¶Ô±È¿â
+// æ ¹æ®cb,crè‚¤è‰²èŒƒå›´å¾—åˆ°äººè„¸è‚¤è‰²å¯¹æ¯”åº“
 void FaceCbcr();
 
-// ´ÓYCbCr¿Õ¼äÄ£ĞÍÍ¼ÏñÖĞ¼ì²â³öÈËÁ³
+// ä»YCbCrç©ºé—´æ¨¡å‹å›¾åƒä¸­æ£€æµ‹å‡ºäººè„¸
 void FaceDetect(char *, int , int);
 
-// Í¶Ó°·¨·Ö¸îÈËÁ³Î»ÖÃ£¬Í¶Ó°·ôÉ«¼ÆËãÏÂ±êÏñËØÊı
+// æŠ•å½±æ³•åˆ†å‰²äººè„¸ä½ç½®ï¼ŒæŠ•å½±è‚¤è‰²è®¡ç®—ä¸‹æ ‡åƒç´ æ•°
 bool CountFacePixel(char *, int, int, char *, int &, int &);
 
-// ÌáÈ¡ÈËÁ³
+// æå–äººè„¸
 bool ExtractFace(char *, int, int, int &, int &);
 
 
