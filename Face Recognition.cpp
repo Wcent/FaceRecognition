@@ -428,6 +428,8 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 *************************************************************************************************/
 void SearchFace()
 {
+	char imgFileName[256];
+	
 	//隐藏视频捕获窗口
 	ShowWindow(hwndCap, SW_HIDE);
 	//设置帧图像捕获回调函数为空
@@ -437,8 +439,8 @@ void SearchFace()
 	if ( !FaceCbcrProc() )
 		goto BREAK_SEARCH;
 	
-	OpenImageFile("选择搜索目标人脸图像");
-	if ( !strlen(ImgFileName) || !ReadBmpFile(ImgFileName, Image) )
+	OpenImageFile("选择搜索目标人脸图像", imgFileName);
+	if ( !strlen(imgFileName) || !ReadBmpFile(imgFileName, Image) )
 		goto BREAK_SEARCH;
 	ShowBmpImage(Image, ImageWidth, ImageHeight, 300, 200);
 	

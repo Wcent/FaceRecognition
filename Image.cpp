@@ -9,7 +9,6 @@
 #include "image.h"
 
 HDC hWinDC;
-char ImgFileName[256];
 char Image[320*240*3];
 char NewImage[320*240*3];
 int ImageWidth;
@@ -25,10 +24,13 @@ int dstLBP[49*59];
 
 /************************************************************************************************
 *																								*
-*	获取文件名函数OpenImageFile(char *OPDLTitle)												*
+*	获取文件名函数OpenImageFile(char *OPDLTitle, char *pImgFileName)							*
+*																								*
+*   输入参数：OPDLTitle    - 文件选择对话框标题                                                 *
+*   输出参数：pImgFileName - 选择目标的文件名                                                   *
 *																								*
 ************************************************************************************************/
-void OpenImageFile(char *OPDLTitle)
+void OpenImageFile(char *OPDLTitle, char *pImgFileName)
 {
 	char FileTitle[100], ImgDlgFileDir[256];
 	OPENFILENAME ofn;
@@ -43,7 +45,7 @@ void OpenImageFile(char *OPDLTitle)
 	ofn.lpstrCustomFilter=NULL;
 	ofn.nMaxCustFilter=0;
 	ofn.nFilterIndex=1;
-	ofn.lpstrFile=ImgFileName;
+	ofn.lpstrFile=pImgFileName;
 	ofn.nMaxFile=MAX_PATH;
 	ofn.lpstrFileTitle=FileTitle;
 	ofn.nMaxFileTitle=99;
@@ -54,7 +56,7 @@ void OpenImageFile(char *OPDLTitle)
 	ofn.lCustData=NULL;
 	ofn.lpfnHook=NULL;
 	ofn.lpTemplateName=NULL;
-	ImgFileName[0]='\0';
+	pImgFileName[0]='\0';
 	GetOpenFileName(&ofn); 
 
 	getcwd(ImgDlgFileDir, MAX_PATH);
@@ -62,44 +64,53 @@ void OpenImageFile(char *OPDLTitle)
 
 /**********************************************************************************************
 *																							  *	
+*   提取24位真彩色位图像素RGB数据函数														  *	
 *   丢掉用来补齐位图width*3字节数到4倍数的0像素数据，得到bmp的RGB真实图像数据				  *
+*																							  *	
+*   输入参数：pImageData - 24位真彩色原始位图文件中分解出来的像素数据                         *
+*             width      - 位图宽度						    							  	  *
+*             height     - 位图高度															  *
 *																							  *
 **********************************************************************************************/
-void ExtractImageData(char *image, int width, int height)
+void ExtractImageData(char *pImageData, int width, int height)
 {
 	int i, j;
-	int cz;
-	int cp;
+	int cntZeros;
+	int cntPixels;
 	
 	// 每行像素字节数为非4倍数，用0补齐每行像素字节数到4的倍数
 	if ( !(width*3 % 4) )
 		return ;
 	
 	// 补齐0的字节数
-	cz = 4 - width * 3 % 4;
-	// 像素指针
-	cp = 0;
+	cntZeros = 4 - width * 3 % 4;
+	
+	// 像素数据指示器
+	cntPixels = 0;
 	for ( j=0; j<height; j++ )
 	{
 		for ( i=0; i<width; i++ )
 		{
 			// 位图真实像素数据保留
-			image[j*width*3+i*3] = image[cp++];
-			image[j*width*3+i*3+1] = image[cp++];
-			image[j*width*3+i*3+2] = image[cp++];
+			pImageData[j*width*3+i*3]   = pImageData[cntPixels++];
+			pImageData[j*width*3+i*3+1] = pImageData[cntPixels++];
+			pImageData[j*width*3+i*3+2] = pImageData[cntPixels++];
 		}
-		// 每行丢掉cz个字节的补齐4倍数的无效像素数据
-		for ( i=0; i<cz; i++ )
-			cp++;
+		// 每行丢掉cntZeros个字节的补齐4倍数的无效像素数据
+		for ( i=0; i<cntZeros; i++ )
+			cntPixels++;
 	}
 }
 
 /************************************************************************************************
 *																								*
-*   从BMP图像中，读出图像头信息，主要包括图像长度和宽度											*
+*   读取24位真彩色位图像素数据函数，每个像素用3个字节RGB表示                                    *
+*   打开图像文件，解析位图文件结构，分解出位图文件头、位图信息头，像素数据						*
+*   输入参数：imgFileName - 文件名                                                              *
+*   输出参数：oImage      - 存放24位真彩色位图像素RGB数据及图像尺寸结构指针                     *
 *																								*
 ************************************************************************************************/
-BOOL ReadBmpFile(LPSTR ImageFileName, char *oImage)
+BOOL ReadBmpFile(LPSTR imgFileName, BmpImage *oImage)
 {
 	OFSTRUCT of;
 	HFILE Image_fp;
@@ -107,16 +118,17 @@ BOOL ReadBmpFile(LPSTR ImageFileName, char *oImage)
 	BITMAPINFOHEADER biImage;
 	int i, j;
 	char tmpPixel;
-	char *tmpImage;
+	char *pTmpImgData;
 
-	Image_fp = OpenFile(ImageFileName, &of, OF_READ);
+	
+	Image_fp = OpenFile(imgFileName, &of, OF_READ);
 	if (Image_fp == HFILE_ERROR) 
 	{
 		MessageBox(NULL, "打开读bmp图像文件出错", "打开文件出错信息", MB_OK);
 		return FALSE;
 	}
 
-	// 读取位图文件头
+	// 定位及读取位图文件头
 	_llseek(Image_fp, 0, 0);
 	_lread(Image_fp, &bfImage, sizeof(BITMAPFILEHEADER));
 
@@ -136,45 +148,51 @@ BOOL ReadBmpFile(LPSTR ImageFileName, char *oImage)
 		return FALSE;
 	}
 
-	ImageWidth = biImage.biWidth;
-	ImageHeight= biImage.biHeight;
-	tmpImage = (char *)malloc(biImage.biSizeImage);
-	if( tmpImage == NULL )
+	// 分配临时存储像素数据空间
+	pTmpImgData = (char *)malloc(biImage.biSizeImage);
+	if( pTmpImgData == NULL )
+	{
+		MessageBox(NULL, "系统没有足够内存以分配临时存储像素数据空间", "读取bmp文件出错信息", MB_OK);
 		return FALSE;
+	}
 
-	// 读取位图像素阵列数据
+	// 定位及读取位图像素阵列数据
 	_llseek(Image_fp, bfImage.bfOffBits, 0);
-	_lread(Image_fp, tmpImage, biImage.biSizeImage);
+	_lread(Image_fp, pTmpImgData, biImage.biSizeImage);
 
-	// 丢掉bmp像素数据中含多余的补齐width*3字节4倍数的0像素数据，得RGB真实像素数据
-	if ( ImageWidth*3 % 4 )
-		ExtractImageData(tmpImage, ImageWidth, ImageHeight);
+	// 丢掉bmp像素数据中补齐每行像素字节数4倍的无效数据0，得RGB真实像素数据
+	ExtractImageData(pTmpImgData, biImage.biWidth, biImage.biHeight);
+	
 	_lclose(Image_fp);
 
-	ImageWidth = 320;
-	ImageHeight = 240;
-	//图像归一化320 240
-	NormalizeImageSize(oImage, ImageWidth, ImageHeight, 
-						tmpImage, biImage.biWidth, biImage.biHeight);
-	free(tmpImage);
+	//限定输出图像尺寸
+	oImage.width = 320;
+	oImage.height = 240;
+	//图像缩放归一化
+	NormalizeImageSize(oImage, oImage.width, oImage.height, 
+						pTmpImgData, biImage.biWidth, biImage.biHeight);
+						
+	// 释放像素数据临时存储空间
+	free(pTmpImgData);
 
 	// bmp图片像素从下到上，从左到右，倒转为从上到下，从左到右
-	for (i=0; i<ImageHeight/2; i++)
+	// 24位真彩色位图每个像素用3个字节R，G，B来表示
+	for (i=0; i<oImage.height/2; i++)
 	{
-		for (j=0; j<ImageWidth; j++)
+		for (j=0; j<oImage.width; j++)
 		{
 			// R
-			tmpPixel					 = oImage[i*ImageWidth*3+j*3];
-			oImage[i*ImageWidth*3+j*3]	 = oImage[(ImageHeight-i-1)*ImageWidth*3+j*3+2];
-			oImage[(ImageHeight-i-1)*ImageWidth*3+j*3+2] = tmpPixel;
+			tmpPixel = oImage[i*oImage.width*3+j*3];
+			oImage[i*oImage.width*3+j*3] = oImage[(oImage.height-i-1)*oImage.width*3+j*3+2];
+			oImage[(oImage.height-i-1)*oImage.width*3+j*3+2] = tmpPixel;
 			// G
-			tmpPixel					 = oImage[i*ImageWidth*3+j*3+1];
-			oImage[i*ImageWidth*3+j*3+1] = oImage[(ImageHeight-i-1)*ImageWidth*3+j*3+1];
-			oImage[(ImageHeight-i-1)*ImageWidth*3+j*3+1] = tmpPixel;
+			tmpPixel = oImage[i*oImage.width*3+j*3+1];
+			oImage[i*oImage.width*3+j*3+1] = oImage[(oImage.height-i-1)*oImage.width*3+j*3+1];
+			oImage[(oImage.height-i-1)*oImage.width*3+j*3+1] = tmpPixel;
 			// B
-			tmpPixel					 = oImage[i*ImageWidth*3+j*3+2];
-			oImage[i*ImageWidth*3+j*3+2] = oImage[(ImageHeight-i-1)*ImageWidth*3+j*3];
-			oImage[(ImageHeight-i-1)*ImageWidth*3+j*3] = tmpPixel;
+			tmpPixel = oImage[i*oImage.width*3+j*3+2];
+			oImage[i*oImage.width*3+j*3+2] = oImage[(oImage.height-i-1)*oImage.width*3+j*3];
+			oImage[(oImage.height-i-1)*oImage.width*3+j*3] = tmpPixel;
 		}
 	}
 
@@ -184,59 +202,66 @@ BOOL ReadBmpFile(LPSTR ImageFileName, char *oImage)
 
 /************************************************************************************************
 *																								*
-*	在屏幕上显示图像函数ShowBmpImage(char *Image, int wImage, int hImage, int xPos, int yPos)	*
+*	在屏幕上显示位图函数ShowBmpImage(BmpImage *pImage, int xPos, int yPos)                    	*
 *																								*
-*   	Image	－存放图像点阵的向量															*
-*		wImage	－图像宽度																		*
-*		hImage	－图像高度																		*
-*		xPos	－图像显示开始位置x坐标															*
-*		yPos	－图像显示开始位置y坐标															*
+*   输入参数：pImage - 存放位图像素数据点阵的向量及尺寸结构的指针								*
+*		      xPos   - 图像显示开始位置x坐标													*
+*		      yPos   - 图像显示开始位置y坐标													*
 *																								*
 ************************************************************************************************/
-void ShowBmpImage(char *Image, int wImage, int hImage, int xPos, int yPos)	
+void ShowBmpImage(BmpImage *pImage, int xPos, int yPos)	
 {
 	int i,j;
 	int r, g, b;
 	
-	for (i=0; i<hImage; i++) 
+	for (i=0; i<pImage->height; i++) 
 	{
-		for (j=0; j<wImage; j++) 
+		for (j=0; j<pImage->width; j++) 
 		{
-			r = (BYTE) Image[i*wImage*3+j*3]; 
-			g = (BYTE) Image[i*wImage*3+j*3+1];
-			b = (BYTE) Image[i*wImage*3+j*3+2];
+			r = (BYTE) Image[i*pImage.width*3+j*3]; 
+			g = (BYTE) Image[i*pImage.width*3+j*3+1];
+			b = (BYTE) Image[i*pImage.width*3+j*3+2];
 			
 			SetPixel(hWinDC, j+xPos, i+yPos, RGB(r, g, b));
 		}
 	}
 }
 
-/*****************************************************************************************
-*																						 *
-*   显示bmp图片的在YCbCr空间下的灰度图													 *
-*																						 *
-*****************************************************************************************/
-void ShowBmpGreyImage(char *Image, int wImage, int hImage, int xPos, int yPos)
+/************************************************************************************************
+*																						        *
+*   显示位图的YCbCr空间灰度图函数   													        *
+*                                                                                               *
+*   输入参数：pImage - 存放位图像素YCbCr空间灰度数据及尺寸结构的指针							*
+*		      xPos   - 图像显示开始位置x坐标													*
+*		      yPos   - 图像显示开始位置y坐标													*
+*																						        *
+************************************************************************************************/
+void ShowBmpGreyImage(BmpImage *pImage, int xPos, int yPos)
 {
 	int i,j;
 	int y;
 	
-	for (i=0; i<hImage; i++) 
+	for (i=0; i<pImage->height; i++) 
 	{
-		for (j=0; j<wImage; j++) 
+		for (j=0; j<pImage->width; j++) 
 		{
-			y = (BYTE)Image[i*wImage*3+j*3];
+			y = (BYTE)Image[i*pImage->width*3+j*3];
 			SetPixel(hWinDC, j+xPos, i+yPos, RGB(y, y, y));
 		}
 	}
 }
 
-/***************************************************************************************
-*																					   *
-*   清屏，把显示的图像清为白色														   *	
-*																					   *
-***************************************************************************************/
-void CleanUpShowImage(int width, int height, int x, int y)
+/************************************************************************************************
+*																					   			*
+*   清屏函数，把显示的图像清为白色													   			*
+*                                                                                               *
+*   输入参数：width  - 清屏区域宽度 															*
+*             height - 清屏区域高度 															*
+*		      xPos   - 图像显示开始位置x坐标													*
+*		      yPos   - 图像显示开始位置y坐标													*
+*																					   			*
+************************************************************************************************/
+void CleanUpShowImage(int width, int height, int xPos, int yPos)
 {
 	int i, j;
 
@@ -244,52 +269,53 @@ void CleanUpShowImage(int width, int height, int x, int y)
 	{
 		for ( i=0; i<width; i++ )
 		{
-			SetPixel(hWinDC, x+i, y+j, RGB(255, 255, 255));
-			SetPixel(hWinDC, x+i, y+height-j, RGB(255, 255, 255));
+			SetPixel(hWinDC, xPos+i, yPos+j, RGB(255, 255, 255));
+			SetPixel(hWinDC, xPos+i, yPos+height-j, RGB(255, 255, 255));
 		}
 	}
 }
 
 
-/**************************************************************************************************
-*																								  *	
-*   图像尺寸大小归一化：最临近插值算法缩放，线性												  *
-*   nImage: new image																			  *
-*   nWidth: new width																			  *
-*	nHeight: new height																			  *
-*																								  *
-**************************************************************************************************/
-void NormalizeImageSize( char *dstImage, int nWidth, int nHeight, 
-						char *image, int width, int height)
+/************************************************************************************************
+*																								*	
+*   图像尺寸缩放归一化函数，最临近插值算法缩放线性												*
+*                                                                                               *
+*   输入参数：pSrcImage - 原始位图结构指针														*
+*                 width - 缩放后宽度															*
+*	             height - 缩放后高度															*
+*   输出参数：pDstImage - 目标位图结构指针														*
+*																								*
+************************************************************************************************/
+void NormalizeImageSize( BmpImage *pDstImage, BmpImage *pSrcImage, int width, int height)
 {
 	int i, j;
 	int x, y;
 	double rx, ry;
 
 	// 缩放比例
-	rx = (double)width/nWidth;
-	ry = (double)height/nHeight;
-	for ( j=0; j<nHeight; j++ )
+	rx = (double)pSrcImage->width/width;
+	ry = (double)pSrcImage->height/height;
+	for ( j=0; j<height; j++ )
 	{
-		// 映射到原height下标
+		// 映射到原pSrcImage->height下标
 		y = (int)(j*ry+0.5);
 		if ( y<0 )
 			y = 0;
-		else if ( y>=height )
-			y = height-1;
+		else if ( y>=pSrcImage->height )
+			y = pSrcImage->height-1;
 
-		for ( i=0; i<nWidth; i++ )
+		for ( i=0; i<width; i++ )
 		{
-			// 映射到原width下标
+			// 映射到原pSrcImage->width下标
 			x = (int)(i*rx+0.5);
 			if ( x<0 )
 				x = 0;
-			else if ( x>=width )
-				x = width-1;
+			else if ( x>=pSrcImage->width )
+				x = pSrcImage->width-1;
 
-			dstImage[j*3*nWidth+i*3+0] = image[y*3*width+x*3+0];
-			dstImage[j*3*nWidth+i*3+1] = image[y*3*width+x*3+1];
-			dstImage[j*3*nWidth+i*3+2] = image[y*3*width+x*3+2];
+			dstImage[j*3*width+i*3+0] = image[y*3*pSrcImage->width+x*3+0];
+			dstImage[j*3*width+i*3+1] = image[y*3*pSrcImage->width+x*3+1];
+			dstImage[j*3*width+i*3+2] = image[y*3*pSrcImage->width+x*3+2];
 		}
 	}
 }
@@ -376,6 +402,7 @@ bool FaceCbcrProc()
 {
 	OFSTRUCT of;
 	char sampleImagePath[1024];
+	BmpImage image;
 
 	strcpy(sampleImagePath, curDir);
 	strcat(sampleImagePath, "\\FaceSample.bmp");		
@@ -389,9 +416,9 @@ bool FaceCbcrProc()
 	}
 
 	// 打开FaceSample.bmp肤色样本图
-	if ( !ReadBmpFile(sampleImagePath, Image) )
+	if ( !ReadBmpFile(sampleImagePath, &image) )
 		return false;
-	RgbToYcbcr(Image, NewImage, ImageWidth, ImageHeight);
+	RgbToYcbcr(&image, NewImage, ImageWidth, ImageHeight);
 	// 由样本肤色Cb，Cr得到人脸肤色对比库
 	FaceSampleCbcr(NewImage, ImageWidth, ImageHeight);
 
@@ -730,9 +757,10 @@ int ChiSquareStatistic(int *dstLBP, int *baseLBP, int len)
 ********************************************************************************************/
 bool SearchFace(char *facebaseDir, int *dstLBP)
 {
-	char findFileName[100];
+	char findFileName[256];
 	char strFilter[1024];
 	char findFilePath[1024];
+	BmpImage image, faceImage;
 	WIN32_FIND_DATA findFileData;
 	HANDLE hFindFile;
 
@@ -759,16 +787,16 @@ bool SearchFace(char *facebaseDir, int *dstLBP)
 		strcpy(findFilePath, facebaseDir);
 		strcat(findFilePath, "\\");
 		strcat(findFilePath, findFileName);
-		ReadBmpFile(findFilePath, Image);
+		ReadBmpFile(findFilePath, &image);
 		
-		if ( !ExtractFace(Image, ImageWidth, ImageHeight, FaceWidth, FaceHeight) )
+		if ( !ExtractFace(image, ImageWidth, ImageHeight, FaceWidth, FaceHeight) )
 			continue;
 		// normalize face image to 70 70 size
-		NormalizeImageSize(NewImage, 70, 70, Image, FaceWidth, FaceHeight);
-		ShowBmpImage(NewImage, 70, 70, 750, 20);
-		RgbToYcbcr(NewImage, NewImage, 70, 70);
-		ExtractImageLbp(NewImage, 70, 70, LBP);
-		ShowBmpGreyImage(NewImage, 70, 70, 750, 100);
+		NormalizeImageSize(&faceImage, 70, 70, image, FaceWidth, FaceHeight);
+		ShowBmpImage(&faceImage, 750, 20);
+		RgbToYcbcr(faceImage, faceImage, 70, 70);
+		ExtractImageLbp(faceImage, 70, 70, LBP);
+		ShowBmpGreyImage(&faceImage, 750, 100);
 
 		int x2;
 		char strx2[50];
@@ -777,8 +805,8 @@ bool SearchFace(char *facebaseDir, int *dstLBP)
 		{
 			wsprintf(strx2, "%s%d", "x^2 = ", x2);
 			TextOut(hWinDC, 700, 180, strx2, strlen(strx2));
-			ReadBmpFile(findFilePath, Image);
-			ShowBmpImage(Image, ImageWidth, ImageHeight, 660, 200);
+			ReadBmpFile(findFilePath, &image);
+			ShowBmpImage(&image, 660, 200);
 			
 			FindClose(hFindFile);
 			return true;
@@ -808,11 +836,11 @@ bool RecognizeFace(char *Image, int width, int height, char *facebasePath)
 		return false;
 
 	// normalize face image to 70 70 size
-	NormalizeImageSize(NewImage, 70, 70, Image, FaceWidth, FaceHeight);
-	ShowBmpImage(NewImage, 70, 70, 660, 20);
+	NormalizeImageSize(&faceImage, 70, 70, Image, FaceWidth, FaceHeight);
+	ShowBmpImage(&faceImage, 70, 70, 660, 20);
 	RgbToYcbcr(NewImage, NewImage, 70, 70);
 	ExtractImageLbp(NewImage, 70, 70, dstLBP);
-	ShowBmpGreyImage(NewImage, 70, 70, 660, 100);
+	ShowBmpGreyImage(&faceImage, 660, 100);
 
 	return SearchFace(facebasePath, dstLBP);
 }
@@ -897,13 +925,14 @@ bool EnterFace(char *imgFileName, char *facebasePath)
 void DeleteFace()
 {
 	char facePath[256];
-	char FileTitle[100], ImgDlgFileDir[256];
-	char SelImgFileDir[256];
+	char fileTitle[100], imgDlgFileDir[256];
+	char selImgFileDir[256];
 	OPENFILENAME ofn;
+	BmpImage image;
 
 	// 指定选择对话框打开人脸库目录
-	strcpy(ImgDlgFileDir, curDir);
-	strcat(ImgDlgFileDir, "\\Facebase");
+	strcpy(imgDlgFileDir, curDir);
+	strcat(imgDlgFileDir, "\\Facebase");
 
 	memset(&ofn,0,sizeof(ofn));
 	ofn.lStructSize=sizeof(OPENFILENAME);
@@ -915,9 +944,9 @@ void DeleteFace()
 	ofn.nFilterIndex=1;
 	ofn.lpstrFile=facePath;
 	ofn.nMaxFile=MAX_PATH;
-	ofn.lpstrFileTitle=FileTitle;
+	ofn.lpstrFileTitle=fileTitle;
 	ofn.nMaxFileTitle=99;
-	ofn.lpstrInitialDir=ImgDlgFileDir;
+	ofn.lpstrInitialDir=imgDlgFileDir;
 	ofn.lpstrTitle="选择要移除的人脸样本图像";
 	ofn.Flags=OFN_FILEMUSTEXIST;
 	ofn.lpstrDefExt="raw";
@@ -927,24 +956,24 @@ void DeleteFace()
 	facePath[0]='\0';
 	GetOpenFileName(&ofn); 
 
-	getcwd(SelImgFileDir, MAX_PATH);
+	getcwd(selImgFileDir, MAX_PATH);
 
 	// 路径空时，取消
 	if ( !strlen(facePath) )
 		return ;
 
 	TextOut(hWinDC, 660, 20, "已选择待移除的人脸样本：", strlen("已选择待移除的人脸样本："));
-	ReadBmpFile(facePath, Image);
-	ShowBmpImage(Image, ImageWidth, ImageHeight, 660, 50);
-	ExtractFace(Image, ImageWidth, ImageHeight, FaceWidth, FaceHeight);
+	ReadBmpFile(facePath, &image);
+	ShowBmpImage(&image, ImageWidth, ImageHeight, 660, 50);
+	ExtractFace(image, ImageWidth, ImageHeight, FaceWidth, FaceHeight);
 	// normalize face image to 70 70 size
-	NormalizeImageSize(NewImage, 70, 70, Image, FaceWidth, FaceHeight);
-	ShowBmpImage(NewImage, 70, 70, 730, ImageHeight+80);
+	NormalizeImageSize(NewImage, 70, 70, image, FaceWidth, FaceHeight);
+	ShowBmpImage(&NewImage, 70, 70, 730, ImageHeight+80);
 	RgbToYcbcr(NewImage, NewImage, 70, 70);
 	ExtractImageLbp(NewImage, 70, 70, dstLBP);
-	ShowBmpGreyImage(NewImage, 70, 70, 850, ImageHeight+80);
+	ShowBmpGreyImage(&faceImage, 850, ImageHeight+80);
 
-	if ( strcmp(SelImgFileDir, ImgDlgFileDir) )
+	if ( strcmp(selImgFileDir, imgDlgFileDir) )
 	{
 		MessageBox(hMainWnd, "移除失败，选择的不是人脸取样库目录...\\Facebase下的图像", "移除人脸样本", 0);
 		return ;

@@ -7,7 +7,6 @@
 
 extern HWND hMainWnd; // handle of main window
 extern HDC hWinDC;
-extern char ImgFileName[256];
 extern char Image[320*240*3];
 extern char NewImage[320*240*3];
 extern int ImageWidth;
@@ -16,11 +15,10 @@ extern int FaceWidth;
 extern int FaceHeight;
 extern char curDir[1024];
 
-#define XPOS			20
-#define YPOS			20
-#define MAXIMAGEWIDTH	320
-#define MAXIMAGEHEIGHT	240
-#define IMAGEGAP		40
+#define XPOS		    	20
+#define YPOS		    	20
+#define MAX_IMAGE_WIDTH	    320
+#define MAX_IMAGE_HEIGHT	240
 
 
 // 24位真彩色位图结构定义
@@ -28,27 +26,18 @@ extern char curDir[1024];
 // width & height：存放BMP真实尺寸
 typedef struct _BmpImage
 {
-	char image[MAXIMAGEWIDTH*MAXIMAGEHEIGHT*3];
+	char image[MAX_IMAGE_WIDTH*MAX_IMAGE_HEIGHT*3];
 	int width;
 	int height;
 } BmpImage;
 
 
 
-/*
-	hWinDC = GetDC(hWnd);
-	OpenImageFile("打开图像文件");
-	ReadImage(ImgFileName, NewImage, 256, 256);	//读图像系数
-	ShowImage(image, 256, 256, 100, 100);			//显示图像
-*/
-
-
-
-// 获取选择文件名
-void OpenImageFile(char *);
+// 获取选择目标文件名
+void OpenImageFile(char *OPDLTitle, char *pImgFileName);
 
 // 读取bmp图像文件
-BOOL ReadBmpFile(LPSTR, char *);
+BOOL ReadBmpFile(LPSTR imgFileName, BmpImage *oImage);
 
 // 显示bmp图像
 void ShowBmpImage(char *, int, int, int, int);
