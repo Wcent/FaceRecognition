@@ -31,6 +31,7 @@
 #define IDM_FACERECOGNITION             32778
 #define IDM_ENTERINGFACE                32779
 #define IDM_SEARCHFACE                  32781
+#define IDM_CHOOSE                      32781
 #define IDM_DELETE                      32783
 #define IDC_STATIC                      -1
 

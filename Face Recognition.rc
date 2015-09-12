@@ -47,7 +47,7 @@ BEGIN
     END
     MENUITEM "人脸识别",                    IDM_FACERECOGNITION
     MENUITEM "人脸取样",                    IDM_ENTERINGFACE
-    MENUITEM "选图识别",                    IDM_SEARCHFACE
+    MENUITEM "选图识别",                    IDM_CHOOSE
     MENUITEM "移除人脸取样",                IDM_DELETE
     POPUP "帮助&(H)"
     BEGIN

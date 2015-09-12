@@ -37,7 +37,7 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam);
 //声明frame callback函数，frame available调用
 LRESULT PASCAL FrameCallbackProc(HWND hwnd, LPVIDEOHDR lpVHdr);
 //选择目标图像进行人脸识别
-void SearchFace();
+void ChooseImageToRecognizeFace();
 
 
 // Foward declarations of functions included in this code module:
@@ -200,8 +200,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			DeleteFace();
 			break;
 
-		case IDM_SEARCHFACE:
-			SearchFace();
+		case IDM_CHOOSE:
+			ChooseImageToRecognizeFace();
 			break;
 
 		case IDM_ABOUT:
@@ -426,7 +426,7 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 	根据选择的目标图像，进行人脸识别
 
 *************************************************************************************************/
-void SearchFace()
+void ChooseImageToRecognizeFace()
 {
 	char imgFileName[256];
 	
@@ -437,11 +437,11 @@ void SearchFace()
 	
 	// 得到人脸肤色Cb，Cr对比库cbcr[cb][cr]
 	if ( !FaceCbcrProc() )
-		goto BREAK_SEARCH;
+		goto STOP_RECOGNIZING;
 	
 	OpenImageFile("选择搜索目标人脸图像", imgFileName);
 	if ( !strlen(imgFileName) || !ReadBmpFile(imgFileName, Image) )
-		goto BREAK_SEARCH;
+		goto STOP_RECOGNIZING;
 	ShowBmpImage(Image, ImageWidth, ImageHeight, 300, 200);
 	
 	strcpy(facebasePath, curDir);
@@ -452,7 +452,8 @@ void SearchFace()
 		MessageBox(hMainWnd, "匹配成功！", "人脸识别", 0);
 	else 
 		MessageBox(hMainWnd, "匹配失败！", "人脸识别", 0);
-BREAK_SEARCH:
+
+STOP_RECOGNIZING:
 	// Update Show window rect
 	InvalidateRect(hMainWnd, NULL, true);
 	ShowWindow(hwndCap, SW_SHOW);
