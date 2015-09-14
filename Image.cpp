@@ -9,17 +9,38 @@
 #include "image.h"
 
 HDC hWinDC;
-char Image[320*240*3];
-char NewImage[320*240*3];
-int ImageWidth;
-int ImageHeight;
-int FaceWidth;
-int FaceHeight;
-int cbcr[320][240];
-int ci[320];
-int cj[240];
-int LBP[49*59];
-int dstLBP[49*59];
+int cbcr[256][256];    // 人脸肤色CbCr范围统计库
+
+/************************************************************************************
+	静态函数声明
+
+************************************************************************************/
+// RGB色彩空间模型转换到YCbCr空间模型
+static void RgbToYcbcr(BmpImage *pDstImage, BmpImage *pSrcImage);
+
+// 图片膨胀处理
+static void Expand(BmpImage *pImage);
+// 图片腐蚀处理
+static void Erode(BmpImage *pImage);
+// 过滤掉小块人脸候选区域背景噪音
+static void FilterNoise(BmpImage *pImage);
+
+// 处理FaceSample.bmp人脸肤色样本库
+static void FaceSampleCbcr(BmpImage *pImage);
+// 根据cb,cr肤色范围得到人脸肤色对比库
+static void FaceCbcr();
+// 从YCbCr空间模型图像中检测出人脸
+static void FaceDetect(BmpImage *pImage);
+// 投影法分割人脸位置，投影肤色计算下标像素数
+static bool SplitFace(BmpImage *pFaceImage, BmpImage *pImage);
+
+// 提取灰度图像纹理的LBP特征，统计LBP特征直方图表征人脸
+static void ExtractImageLbp(BmpImage *pImage, int *LBP );
+// 卡方统计两图像LBP相似度
+static int ChiSquareStatistic(int *dstLBP, int *baseLBP, int len);
+// 查找人脸库中是否存在目标人脸
+static bool SearchFace(char *facebaseDir, int *dstLBP);
+
 
 
 /************************************************************************************************
@@ -331,7 +352,7 @@ void NormalizeImageSize( BmpImage *pDstImage, BmpImage *pSrcImage, int width, in
 *   输出参数：pDstImage - YCbCr色彩空间模型的目标位图结构指针									    *
 *																									*
 ****************************************************************************************************/
-void RgbToYcbcr(BmpImage *pDstImage, BmpImage *pSrcImage)
+static void RgbToYcbcr(BmpImage *pDstImage, BmpImage *pSrcImage)
 {
 	int i, j;
 	int r, g, b;
@@ -376,7 +397,7 @@ void RgbToYcbcr(BmpImage *pDstImage, BmpImage *pSrcImage)
 *   输出参数：cbcr[][] - 人脸肤色CbCr范围统计库                							 *
 *																						 *		
 *****************************************************************************************/
-void FaceSampleCbcr(BmpImage *pImage)
+static void FaceSampleCbcr(BmpImage *pImage)
 {
 	int i, j;
 	int y, cb, cr;
@@ -403,7 +424,7 @@ void FaceSampleCbcr(BmpImage *pImage)
 *   输出参数：cbcr[][] - 人脸肤色CbCr范围统计库                							*
 *																						*
 ****************************************************************************************/
-void FaceCbcr()
+static void FaceCbcr()
 {
 	int i, j;
 
@@ -425,7 +446,7 @@ void FaceCbcr()
 bool FaceCbcrProc()
 {
 	OFSTRUCT of;
-	char sampleImagePath[1024];
+	char sampleImagePath[256];
 	BmpImage image;
 
 	strcpy(sampleImagePath, curDir);
@@ -496,11 +517,13 @@ void FaceDetect(BmpImage *pImage)
 *   输出参数：pFaceImage - 人脸位图结构指针                       						 *
 *																						 *
 *****************************************************************************************/
-bool CountFacePixel(BmpImage *pFaceImage, BmpImage *pImage)
+static bool SplitFace(BmpImage *pFaceImage, BmpImage *pImage)
 {
 	int i, j;
 	int y;
 	int widthStart, widthEnd, heightStart, heightEnd;
+	int ci[320];
+	int cj[240];
 
 	// 初始化两坐标轴上肤色像素统计值
 	memset(ci, 0, sizeof(ci));
@@ -601,15 +624,25 @@ bool CountFacePixel(BmpImage *pFaceImage, BmpImage *pImage)
 
 /***********************************************************************************
 *																				   *
-*	提取image(width, height)第(m,n)block第(i,j)pixel点在领域内LBP值				   *
-*	count：LBP模式二值序列中0->1或1->0变化次数，								   *
-*	count<=2，ULBP模式															   *
-*	r：半径为r的环形领域														   *
-*	p：环形领域圆周上的像素点数													   *
+*	提取位图中第(m,n)block中第(i,j)像素点在领域内LBP值函数         			  	   *
+*   取半径为r的环形领域上，圆周上P像素点数计算其Uniform LBP                        *
+*   LBP模式二值序列中0->1或1->0变化次数小于等于2次的为Uniform LBP                  *
+*																				   *
+*   输入参数：image      - 位图像素数据		                            		   *
+*             width      - 位图宽度                                                *
+*             height     - 位图高度                                                *
+*             m          - 块所在行号                                              *
+*             n          - 块所在列号                                              *
+*             blkWidth   - 位图分块宽度                                            *
+*             blkHeight  - 位图分块高度                                            *
+*             i          - 当前块像素行号                                          *
+*             j          - 当前块像素列号                                          *
+*   返回值：  LBP                                                				   *
+*                        														   *
 *																				   *
 ***********************************************************************************/
 BYTE PixelLbp(char *image, int width, int height, 
-			  int m, int n, int bw, int bh, int i, int j)
+              int m, int n, int blkWidth, int blkHeight, int i, int j)
 {
 	int k;
 	int r, p;
@@ -623,7 +656,7 @@ BYTE PixelLbp(char *image, int width, int height,
 	pi = 3.1415927;
 	lbp = 0;
 	// 中心像素作阈值
-	coff = (BYTE)image[(bh*n+j)*width*3+(bw*m+i)*3];
+	coff = (BYTE)image[(blkHeight*n+j)*width*3+(blkWidth*m+i)*3];
 	// 与环形圆周上的8个领域像素点比较，得二值序列（LBP模式）
 	for ( k=0; k<p; k++ )
 	{
@@ -631,8 +664,8 @@ BYTE PixelLbp(char *image, int width, int height,
 		x = (int)(i + r*sin(2*pi*k/p) + 0.5);
 		y = (int)(j - r*cos(2*pi*k/p) + 0.5);
 		// 像素下标从block坐标系转换到image坐标系
-		x += bw * m;
-		y += bh * n;
+		x += blkWidth * m;
+		y += blkHeight * n;
 		if ( x < 0 )
 			x = 0;
 		else if ( x >= width )
@@ -652,12 +685,16 @@ BYTE PixelLbp(char *image, int width, int height,
 	return lbp;
 }
 
-/********************************************************************************************
-*																							*
-*    旋转不变性LBP，循环移位得当前LBP各个模式，取最小值LBP									*
-*    n : lbp模式二进制位数，模式位宽														*
-*																							*
-********************************************************************************************/
+/***********************************************************************************
+*																				   *	
+*   取旋转不变性LBP值函数            		                            		   *
+*   十进制数值最小LBP即为旋转不变性LBP，循环移位得当前LBP各个模式，取最小值LBP	   *
+*                                                                                  *
+*   输入参数：lbp  - LBP模式		                            		           *
+*             n    - 模式二进制位数位宽                                            *
+*   返回值：  旋转不变性lbp                                                        *
+*												     							   *
+***********************************************************************************/
 BYTE MinLbp(BYTE lbp, int n)
 {
 	int i;
@@ -677,18 +714,21 @@ BYTE MinLbp(BYTE lbp, int n)
 	return min;
 }
 
-/******************************************************************************************
-*																						  *
-*	提取灰度图像纹理的LBP特征，统计LBP特征直方图表征人脸								  *
-*																						  *
-******************************************************************************************/
-void ExtractImageLbp(char *image, int width, int height, int *LBP )
+/***********************************************************************************
+*																				   *
+*	提取灰度图像纹理的LBP特征并统计LBP特征直方图表征人脸函数					   *
+*																				   *
+*   输入参数：pImage  - 图像结构指针     		                            	   *
+*   输出参数：LBP     - LBP特征直方图                           		           *
+*																				   *
+***********************************************************************************/
+static void ExtractImageLbp(BmpImage *pImage, int *LBP )
 {
 	int i, j, k;
 	int n, m, blkCount;
-	int bw, bh;
+	int blkWidth, blkHeight;
 	BYTE lbp;
-	int ULBPtable[256];
+	int ULBPtable[256];    // uniform LBP 索引映射表
 	char *tmpImage;
 
 	memset(ULBPtable, -1, sizeof(ULBPtable));
@@ -701,36 +741,37 @@ void ExtractImageLbp(char *image, int width, int height, int *LBP )
 			if ( ((i&(1<<j))<<1 ) != (i&(1<<(j+1))) )
 				count++;
 		}
-		// uniform LBP 索引映射表
+		// 建立映射关系
 		if ( count <= 2 )
 			ULBPtable[i] = k++;
 	}
 
-	// keep原image临时空间
-	tmpImage = (char *)malloc(width*height*3);
+	tmpImage = (char *)malloc(pImage->width*pImage->height*3);
 	// copy image信息到临时空间
-	memcpy(tmpImage, image, width*height*3);
+	memcpy(tmpImage, pImage->image, pImage->width*pImage->height*3);
 	
-	// image分块提取LBP，blkCount*blkCount blocks
+	// 图像分块提取LBP，7*& blocks
 	blkCount = 7;
-	bw = width / blkCount;
-	bh = height / blkCount;
+	blkWidth = pImage->width / blkCount;
+	blkHeight = pImage->height / blkCount;
 	memset(LBP, 0, 59*blkCount*blkCount*sizeof(int));
 	for ( n=0; n<blkCount; n++ )
 	{
 		for ( m=0; m<blkCount; m++ )
 		{
 			// 分块提取LBP
-			for ( j=0; j<bh; j++ )
+			for ( j=0; j<blkHeight; j++ )
 			{
-				for ( i=0; i<bw; i++ )
+				for ( i=0; i<blkWidth; i++ )
 				{
 					// 提取image(blkCount*blkCount)分块中block(m,n)的pixel(i,j)的LBP
-					lbp = PixelLbp(tmpImage, width, height, m, n, bw, bh, i, j);
+					lbp = PixelLbp(tmpImage, pImage->width, pImage->height, m, n, blkWidth, blkHeight, i, j);
+					
 					// 旋转不变性LBP
 			//		lbp = MinLbp(lbp, 8);
+			
 					// LBP二值序列（LBP模式）对应的10进制数作LBP值
-					image[(bh*n+j)*width*3+(bw*m+i)*3] = lbp;
+					pImage->image[(blkHeight*n+j)*pImage->width*3+(blkWidth*m+i)*3] = lbp;
 
 					// 分类统计Uniform LBP直方图，58( p*(p-1)+2 )种ULBP
 					if ( ULBPtable[lbp] != -1 )
@@ -747,29 +788,37 @@ void ExtractImageLbp(char *image, int width, int height, int *LBP )
 	free(tmpImage);
 }
 
-/****************************************************************************************
-*																						*
-*	卡方统计两个图像LBP直方图特征的相似度												*
-*	χ^2 (S,M) = ∑ { (Si-Mi)^2 / (Si+Mi) }												*
-*	     		 i																		*
-****************************************************************************************/
-int ChiSquareStatistic(int *dstLBP, int *baseLBP, int len)
+/***********************************************************************************
+*																				   *
+*	卡方统计两个图像LBP直方图特征的相似度函数									   *
+*	χ^2 (S,M) = ∑ { (Si-Mi)^2 / (Si+Mi) }										   *
+*	     		  																   *
+*   输入参数：dstLBP  - 目标人脸位图LBP特征直方图                            	   *
+*             baseLBP - 人脸库位图LBP特征直方图                                    *
+*             len     - LBP特征直方图维度                                          *
+*   返回值：  卡方值                                            		           *
+*	     		 																   *
+***********************************************************************************/
+static int ChiSquareStatistic(int *dstLBP, int *baseLBP, int len)
 {
 	int i, j;
 	int w[49];
 	double x2;
 
-	// allocate weights for chi square statistic of LBPs
+	// 初始化为LBP特征直方图卡方统计时分配的权重
 	for ( i=0; i<49; i++ )
 		w[i] = 1;
-	// weight 4 for eyes
+		
+	// 眼睛携带人脸重要信息，分配权重为4
 	w[7*1+1] = w[7*1+2] = w[7*2+1] = w[7*2+2] = 4;
 	w[7*1+4] = w[7*1+5] = w[7*2+4] = w[7*2+5] = 4;
-	// weight 2 for mouth and 额头两侧
+	
+	// 嘴和额头两侧权重为2
 	w[7*4+3] = 2;
 	w[0] = w[7*1+0] = 2;
 	w[6] = w[7*1+6] = 2;
-	// weight 0 for nose and 脸下巴两侧
+	
+	// 鼻子和脸下巴两侧权重为0
 	w[7*2+3] = w[7*3+3] = 0;
 	w[7*3+0] = w[7*4+0] = w[7*5+0] = w[7*6+0] = 0;
 	w[7*3+6] = w[7*4+6] = w[7*5+6] = w[7*6+6] = 0;
@@ -787,27 +836,29 @@ int ChiSquareStatistic(int *dstLBP, int *baseLBP, int len)
 	return (int)x2;
 }
 
-/********************************************************************************************
-*																							*
-*	遍历目录facebaseDir所有文件，包括目录													*
-*	处理获取到的.bmp图像文件，得到LBP，与													*
-*	目标查找face的dstLBp处理得相似度量差，													*
-*	根据给定阈值，判断是否为同一人脸，返回													*
-*	判断结果																				*
-*																							*
-********************************************************************************************/
-bool SearchFace(char *facebaseDir, int *dstLBP)
+/***********************************************************************************
+*																				   *
+*	在人脸库中查找与目标人脸位图LBP特征直方图相近人脸函数						   *
+*	设定阀值，小于阀值可认为找到同一人脸										   *
+*	  																			   *
+*   输入参数：dstLBP      - 目标人脸位图LBP特征直方图                          	   *
+*             facebaseDir - 人脸库路径                                             *
+*																				   *
+***********************************************************************************/
+static bool SearchFace(char *facebaseDir, int *dstLBP)
 {
 	char findFileName[256];
-	char strFilter[1024];
-	char findFilePath[1024];
+	char strFilter[256];
+	char findFilePath[256];
 	BmpImage image, faceImage;
 	WIN32_FIND_DATA findFileData;
 	HANDLE hFindFile;
+	int LBP[49*59];
 
 	// 通配符遍历facebaseDir目录下的所以文件，包括目录
 	strcpy(strFilter, facebaseDir);
 	strcat(strFilter, "\\*.*");
+	
 	// 获取目录查找句柄，及第一个文件数据
 	hFindFile = FindFirstFile(strFilter, &findFileData);
 	// 当前目录是否存在
@@ -830,20 +881,24 @@ bool SearchFace(char *facebaseDir, int *dstLBP)
 		strcat(findFilePath, findFileName);
 		ReadBmpFile(findFilePath, &image);
 		
-		if ( !ExtractFace(image, ImageWidth, ImageHeight, FaceWidth, FaceHeight) )
+		if ( !ExtractFace(&faceImage, &image) )
 			continue;
-		// normalize face image to 70 70 size
-		NormalizeImageSize(&faceImage, 70, 70, image, FaceWidth, FaceHeight);
+			
+		// 人脸位图尺寸缩放到70*70
+		NormalizeImageSize(&faceImage, &image, 70, 70);
 		ShowBmpImage(&faceImage, 750, 20);
-		RgbToYcbcr(faceImage, faceImage, 70, 70);
-		ExtractImageLbp(faceImage, 70, 70, LBP);
+		
+		// 色彩空间模型转换
+		RgbToYcbcr(faceImage, faceImage);
+		ExtractImageLbp(&faceImage, LBP);
 		ShowBmpGreyImage(&faceImage, 750, 100);
 
 		int x2;
-		char strx2[50];
 		// LBP卡方统计相似度量值与设定阈值对比，小于默认阈值时，图像相同
 		if ( (x2=ChiSquareStatistic(dstLBP, LBP, 49*59)) < 3000 )
 		{
+			char strx2[50];
+			
 			wsprintf(strx2, "%s%d", "x^2 = ", x2);
 			TextOut(hWinDC, 700, 180, strx2, strlen(strx2));
 			ReadBmpFile(findFilePath, &image);
@@ -866,57 +921,69 @@ bool SearchFace(char *facebaseDir, int *dstLBP)
 }
 
 
-/******************************************************************************************************
-*																									  *
-*	在人脸库中查找出相似度量比较接近目标人脸的图片													  *
-*																									  *
-******************************************************************************************************/
-bool RecognizeFace(char *Image, int width, int height, char *facebasePath)
+/*****************************************************************************************
+*																						 *
+*	在人脸库中查找出相似度量比较接近目标人脸的图片函数									 *
+*																						 *
+*   输入参数：pImage       - 目标位图结构指针  	                						 *
+*             facebasePath - 人脸库路径                          						 *
+*																						 *
+*****************************************************************************************/
+bool RecognizeFace(BmpImage *pImage, char *facebasePath)
 {
-	if ( !ExtractFace(Image, width, height, FaceWidth, FaceHeight) )
+	int dstLBP[49*59];
+	BmpImage faceImage;
+	
+	if ( !ExtractFace(&faceImage, pImage) )
 		return false;
 
 	// normalize face image to 70 70 size
-	NormalizeImageSize(&faceImage, 70, 70, Image, FaceWidth, FaceHeight);
-	ShowBmpImage(&faceImage, 70, 70, 660, 20);
-	RgbToYcbcr(NewImage, NewImage, 70, 70);
-	ExtractImageLbp(NewImage, 70, 70, dstLBP);
+	NormalizeImageSize(&faceImage, pImage, 70, 70);
+	ShowBmpImage(&faceImage, 660, 20);
+	RgbToYcbcr(&faceImage, &faceImage);
+	ExtractImageLbp(&faceImage, dstLBP);
 	ShowBmpGreyImage(&faceImage, 660, 100);
 
 	return SearchFace(facebasePath, dstLBP);
 }
 
-/*****************************************************************************************************
-*																									 *	
-*	对图像处理后，提取人脸																			 *
-*																									 *	
-*****************************************************************************************************/
-bool ExtractFace(char *image, int width, int height, int &fWidth, int &fHeight)
+/*****************************************************************************************
+*																						 *	
+*	提取人脸位图函数 																	 *
+*																						 *
+*   输入参数：pImage       - 目标位图结构指针   	               						 *
+*   输出参数：pFaceImage   - 人脸位图结构指针                          					 *
+*																						 *	
+*****************************************************************************************/
+bool ExtractFace(BmpImage *pFaceImage, BmpImage *pImage)
 {
 	// RGB色彩空间 --> YCbCr空间转换
-	RgbToYcbcr(image, NewImage, width, height);
+	RgbToYcbcr(pImage, pImage);
 	// 预处理YCbCr空间图像得到人脸候选区域的二值化图像
-	FaceDetect(NewImage, width, height);
+	FaceDetect(pImage);
 	
 	// 开运算处理，先腐蚀后膨胀
-	Erode(NewImage, width, height);
-	Expand(NewImage, width, height);
+	Erode(pImage);
+	Expand(pImage);
 	// 去掉非人脸噪音，默认像素数小于阈值时去掉
-	FilterNoise(NewImage, width, height);
+	FilterNoise(pImage);
 
-	// 投影法，计算人脸肤色在width，height的位置投影下标，分割人脸
-	return CountFacePixel(NewImage, width, height, image, fWidth, fHeight);
+	// 分割人脸，投影法：人脸投影到width，height坐标上，得出下标位置
+	return SplitFace(pFaceImage, pImage);
 }
 
-/************************************************************************************************
-*																								*
-*	将捕获到的人脸图像及录入人脸库																*
-*																								*
-************************************************************************************************/
+/*****************************************************************************************
+*																						 *
+*	捕获人脸图像入库函数         														 *
+*																						 *
+*   输入参数：imgFileName   - 人脸位图文件名    	               						 *
+*             facebasePath  - 人脸库位图位置路径                       					 *
+*																						 *
+*****************************************************************************************/
 bool EnterFace(char *imgFileName, char *facebasePath)
 {
-	char fileName[1024];
-	char strFilter[1024];
+	char fileName[256];
+	char strFilter[256];
 	WIN32_FIND_DATA findFileData;
 	HANDLE hFindFile;
 	int count;
@@ -927,6 +994,7 @@ bool EnterFace(char *imgFileName, char *facebasePath)
 	// 通配符遍历facebaseDir目录下的所有文件，包括目录
 	strcpy(strFilter, facebasePath);
 	strcat(strFilter, "\\*.*");
+	
 	// 获取目录查找句柄，及第一个文件数据
 	hFindFile = FindFirstFile(strFilter, &findFileData);
 	// 当前目录是否存在
@@ -948,32 +1016,28 @@ bool EnterFace(char *imgFileName, char *facebasePath)
 	} while ( FindNextFile(hFindFile, &findFileData) );
 	FindClose(hFindFile);
 
-	int t=0;
-	while (1)
-	{
-		// 失败次数超过1000后，照片录入失败
-		if ( t++ >= 1000 )
-			return false;
-
-		wsprintf(fileName, "%s%s%d%s", facebasePath, "\\face", count++, ".bmp");
-		if ( CopyFile(imgFileName, fileName, 1) )
-			break;
-	}
-
+	// 以序号构造录库人脸图像文件名
+	wsprintf(fileName, "%s%s%d%s", facebasePath, "\\face", count++, ".bmp");
+	if ( CopyFile(imgFileName, fileName, 1) == NULL )
+		return false;
 	return true;
 }
 
-void DeleteFace()
+/*****************************************************************************************
+*																						 *
+*	选择删除人脸库中的人脸样本函数 														 *
+*																						 *
+*   输入参数：facebasePath  - 人脸库位图位置路径                       					 *
+*																						 *
+*****************************************************************************************/
+void DeleteFace(char *facebasePath)
 {
 	char facePath[256];
-	char fileTitle[100], imgDlgFileDir[256];
+	char fileTitle[256];
 	char selImgFileDir[256];
 	OPENFILENAME ofn;
-	BmpImage image;
-
-	// 指定选择对话框打开人脸库目录
-	strcpy(imgDlgFileDir, curDir);
-	strcat(imgDlgFileDir, "\\Facebase");
+	BmpImage image, faceImage;
+	int dstLBP[49*59];
 
 	memset(&ofn,0,sizeof(ofn));
 	ofn.lStructSize=sizeof(OPENFILENAME);
@@ -987,7 +1051,7 @@ void DeleteFace()
 	ofn.nMaxFile=MAX_PATH;
 	ofn.lpstrFileTitle=fileTitle;
 	ofn.nMaxFileTitle=99;
-	ofn.lpstrInitialDir=imgDlgFileDir;
+	ofn.lpstrInitialDir=facebasePath;
 	ofn.lpstrTitle="选择要移除的人脸样本图像";
 	ofn.Flags=OFN_FILEMUSTEXIST;
 	ofn.lpstrDefExt="raw";
@@ -997,6 +1061,7 @@ void DeleteFace()
 	facePath[0]='\0';
 	GetOpenFileName(&ofn); 
 
+	// 取得选择目标文件名
 	getcwd(selImgFileDir, MAX_PATH);
 
 	// 路径空时，取消
@@ -1005,16 +1070,18 @@ void DeleteFace()
 
 	TextOut(hWinDC, 660, 20, "已选择待移除的人脸样本：", strlen("已选择待移除的人脸样本："));
 	ReadBmpFile(facePath, &image);
-	ShowBmpImage(&image, ImageWidth, ImageHeight, 660, 50);
-	ExtractFace(image, ImageWidth, ImageHeight, FaceWidth, FaceHeight);
+	ShowBmpImage(&image, 660, 50);
+	
+	ExtractFace(&faceImage, &image);
 	// normalize face image to 70 70 size
-	NormalizeImageSize(NewImage, 70, 70, image, FaceWidth, FaceHeight);
-	ShowBmpImage(&NewImage, 70, 70, 730, ImageHeight+80);
-	RgbToYcbcr(NewImage, NewImage, 70, 70);
-	ExtractImageLbp(NewImage, 70, 70, dstLBP);
-	ShowBmpGreyImage(&faceImage, 850, ImageHeight+80);
+	NormalizeImageSize(&faceImage, &image, 70, 70);
+	ShowBmpImage(&faceImage, 730, faceImage.height+80);
+	
+	RgbToYcbcr(&faceImage, &faceImage);
+	ExtractImageLbp(&faceImage, dstLBP);
+	ShowBmpGreyImage(&faceImage, 850, faceImage.height+80);
 
-	if ( strcmp(selImgFileDir, imgDlgFileDir) )
+	if ( strcmp(selImgFileDir, facebasePath) )
 	{
 		MessageBox(hMainWnd, "移除失败，选择的不是人脸取样库目录...\\Facebase下的图像", "移除人脸样本", 0);
 		return ;
@@ -1022,12 +1089,10 @@ void DeleteFace()
 
 	if ( MessageBox(hMainWnd, "确定移除所选人脸样本图像？", "移除人脸样本", MB_OKCANCEL) == IDCANCEL )
 	{
-		// Update Show Rect()
-		RECT rt;
-		rt.left = 650, rt.top = 20;
-		rt.right = 1000, rt.bottom = 500;
-		InvalidateRect(hMainWnd, &rt, true);
-		return ;
+		if ( !DeleteFile(facePath) )
+			MessageBox(hMainWnd, "移除目标人脸样本图像失败！", "移除人脸样本", 0);
+		else
+			MessageBox(hMainWnd, "移除目标人脸样本成功！", "移除人脸样本", 0);
 	}
 
 	// Update Show Rect()
@@ -1035,21 +1100,16 @@ void DeleteFace()
 	rt.left = 650, rt.top = 20;
 	rt.right = 1000, rt.bottom = 500;
 	InvalidateRect(hMainWnd, &rt, true);
-
-	if ( !DeleteFile(facePath) )
-	{
-		MessageBox(hMainWnd, "移除目标人脸样本图像失败！", "移除人脸样本", 0);
-		return ;
-	}
-	MessageBox(hMainWnd, "移除目标人脸样本成功！", "移除人脸样本", 0);
 }
 
-/***********************************************************************************************
-*																							   *
-*	图片膨胀处理																			   *
-*																							   *
-***********************************************************************************************/
-void Expand(char *image, int width, int height)
+/*****************************************************************************************
+*																						 *
+*	图片膨胀处理函数																	 *
+*																						 *
+*   输入输出参数：pImage  - 位图结构指针                               					 *
+*																						 *
+*****************************************************************************************/
+static void Expand(BmpImage *pImage)
 {
 	int i, j, m, n;
 	int coff;
@@ -1058,24 +1118,26 @@ void Expand(char *image, int width, int height)
 		        1, 0, 1};
 	char *tmpImage;
 
-	tmpImage = (char *)malloc(width*height*3);
-	memcpy(tmpImage, image, width*height*3);
+	tmpImage = (char *)malloc(pImage->width*pImage->height*3);
+	memcpy(tmpImage, pImage->image, pImage->width*pImage->height*3);
 
-	for ( j=1; j<height-1; j++ )
+	for ( j=1; j<pImage->height-1; j++ )
 	{
-		for ( i=1; i<width-1; i++ )
+		for ( i=1; i<pImage->width-1; i++ )
 		{
+			// 上下左右中存在与目标灰度值255一致像素，同化当前像素，即膨胀
 			for ( m=0; m<3; m++ )
 			{
 				for ( n=0; n<3; n++ )
 				{
 					if ( B[m+n] == 1 )
 						continue;
-					// top/bottom/left/right exist same pixel to target face, expand
-					coff = (BYTE)image[(j+m-1)*width*3+(i+n-1)*3];
+						
+					coff = (BYTE)pImage->image[(j+m-1)*pImage->width*3+(i+n-1)*3];
 					if ( coff == 255 )
 					{
-						tmpImage[j*width*3+i*3] = (char)255;
+						tmpImage[j*pImage->width*3+i*3] = (char)255;
+						// 继续处理下一个像素
 						goto EXPAND_BREAK_I_LOOP;
 					}
 				}
@@ -1083,16 +1145,18 @@ void Expand(char *image, int width, int height)
 EXPAND_BREAK_I_LOOP: ;
 		}
 	}
-	memcpy(image, tmpImage, width*height*3);
+	memcpy(pImage->image, tmpImage, pImage->width*pImage->height*3);
 	free(tmpImage);
 }
 
-/**********************************************************************************************
-*																							  *
-*	图片腐蚀处理																			  *
-*																							  *	
-**********************************************************************************************/
-void Erode(char *image, int width, int height)
+/*****************************************************************************************
+*																						 *
+*	图片腐蚀处理函数																	 *
+*																						 *
+*   输入输出参数：pImage  - 位图结构指针                               					 *
+*																						 *
+*****************************************************************************************/
+static void Erode(BmpImage *pImage)
 {
 	
 	int i, j, m, n;
@@ -1102,24 +1166,26 @@ void Erode(char *image, int width, int height)
 				1, 0, 1};
 	char *tmpImage;
 
-	tmpImage = (char *)malloc(width*height*3);
-	memcpy(tmpImage, image, width*height*3);
+	tmpImage = (char *)malloc(pImage->width*pImage->height*3);
+	memcpy(tmpImage, pImage->image, pImage->width*pImage->height*3);
 
-	for ( j=1; j<height-1; j++ )
+	for ( j=1; j<pImage->height-1; j++ )
 	{
-		for ( i=1; i<width-1; i++ )
+		for ( i=1; i<pImage->width-1; i++ )
 		{
+			// 上下左右中存在与背景灰度值0一致像素，同化当前像素，即腐蚀
 			for ( m=0; m<3; m++ )
 			{
 				for ( n=0; n<3; n++ )
 				{
 					if ( B[m+n] == 1 )
 						continue;
-					// top/bottom/left/right exist same pixel to  background, erode
-					coff = (BYTE)image[(j+m-1)*width*3+(i+n-1)*3];
+					
+					coff = (BYTE)pImage->image[(j+m-1)*pImage->width*3+(i+n-1)*3];
 					if ( coff == 0 )
 					{
-						tmpImage[j*width*3+i*3] = (char)0;
+						tmpImage[j*pImage->width*3+i*3] = (char)0;
+						// 继续处理下一个像素
 						goto ERODE__BREAK_I_LOOP;
 					}
 				}
@@ -1127,41 +1193,42 @@ void Erode(char *image, int width, int height)
 ERODE__BREAK_I_LOOP: ;
 		}
 	}
-	memcpy(image, tmpImage, width*height*3);
+	memcpy(pImage->image, tmpImage, pImage->width*pImage->height*3);
 	free(tmpImage);
 }
 
-/*******************************************************************************************
-*	过滤掉小块人脸候选区域背景噪音														   *
-*	肤色像素点数小于5000时，假定为非人脸区域											   *	
-*	用队列广度优先搜索的方式来统计肤色像素点数											   *	 	
-*																						   *	
-*******************************************************************************************/
-void FilterNoise(char *image, int width, int height)
+/*****************************************************************************************
+*                                                                                        *
+*	过滤背景噪音函数								                					 *
+*	肤色像素点数小于5000时，假定为非人脸区域											 *	
+*	用队列广度优先搜索的方式来统计肤色像素点数											 *
+*																						 *
+*   输入输出参数：pImage  - 位图结构指针                               					 *
+*																						 *	
+*****************************************************************************************/
+void FilterNoise(BmpImage *pImage)
 {
 	int i, j, k;
 	int y;
-	// 肤色像素点计数变量
-	int count;
+	int count;                    // 肤色像素点计数变量
 	int m, n;
-	// 小块非人脸肤色区域最大范围
-	int iMin, iMax, jMin, jMax;
-	// 队列首尾下标指针
-	int tail, head;
-	// 肤色像素点访问队列
-	int iQue[320*240];
+	int iMin, iMax, jMin, jMax;   // 小块非人脸肤色区域最大范围
+	int tail, head;               // 队列首尾下标指针
+	
+	int iQue[320*240];            // 肤色像素点访问队列
 	int jQue[320*20];
-	// 像素点访问标志
-	int flagVisited[320][240] = {0}; 
+	int flagVisited[320][240] = {0};  // 像素点访问标志
+	
 	// 上下左右四周8个像素点的下标差值关系
 	int a[8] = {0, 1, 1, 1, 0, -1, -1, -1};
 	int b[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
 
-	for ( j=0; j<height; j++ )
+	for ( j=0; j<pImage->height; j++ )
 	{
-		for ( i=0; i<width; i++ )
+		for ( i=0; i<pImage->width; i++ )
 		{
-			y = (BYTE)image[j*width*3+i*3];
+			y = (BYTE)pImage->image[j*pImage->width*3+i*3];
+			
 			// 找第一个肤色像素点，开始广搜计数
 			if ( y == 255 && flagVisited[i][j] == 0 )
 			{
@@ -1170,21 +1237,26 @@ void FilterNoise(char *image, int width, int height)
 				jMin = height;
 				iMax = 0;
 				jMax = 0;
+				
 				// 队列初始化
 				head = 0;
 				tail = 0;
+				
 				// 当前第一个肤色像素点入队
 				iQue[tail] = i;
 				jQue[tail++] = j;
 				// 标记访问记录
 				flagVisited[i][j] = 1;
-				// 队列空？
+				
+				// 循环条件队列非空
 				while ( head < tail )
 				{
 					count++;
 					// 队首出列
 					m = iQue[head];
 					n = jQue[head++];
+					
+					// 更新最大范围
 					if ( m > iMax )
 						iMax = m;
 					if ( m < iMin )
@@ -1193,22 +1265,27 @@ void FilterNoise(char *image, int width, int height)
 						jMax = n;
 					if ( n < jMin )
 						jMin = n;
+						
 					// 往四周8个像素点广搜
 					for ( k=0; k<8; k++ )
 					{
 						// 四周8个点下标位置
 						m = iQue[head-1] + a[k];
 						n = jQue[head-1] + b[k];
+						
 						// 防止越界
 						if ( m<0 || m>=width || n<0 || n>=height )
 							continue;
-						// 新访问点？
+							
+						// 是否已访问过
 						if ( flagVisited[m][n] == 1 )
 							continue;
-						// 肤色像素点？
-						y = (BYTE)image[n*width*3+m*3];
+							
+						// 是否为肤色像素
+						y = (BYTE)pImage->image[n*pImage->width*3+m*3];
 						if ( y != 255 )
 							continue;
+							
 						// 队尾入列
 						iQue[tail] = m;
 						jQue[tail++] = n;
@@ -1217,17 +1294,14 @@ void FilterNoise(char *image, int width, int height)
 					}
 				} // end while ( head < tail )
 
-				// 过滤小块非人脸肤色区域
+				// 过滤小块非人脸肤色区域，假定小于1000个像素点
 				if ( count < 1000 )
 				{
 					for ( n=jMin; n<=jMax; n++ )
 						for ( m=iMin; m<=iMax; m++ )
-							image[n*width*3+m*3] = 0;
+							pImage->image[n*pImage->width*3+m*3] = 0;
 				}
 			} // end if ( y == 255 && flagVisited[i][j] == 0 )
-			// 访问记录
-			else
-				flagVisited[i][j] = 1;
-		}
-	}
+		} // end for i
+	} // end for j
 }

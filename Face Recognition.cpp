@@ -27,9 +27,6 @@ HWND hwndCap; // handle of capture window
 CAPDRIVERCAPS capDrvCaps; // driver capabilities
 bool isRecognition = false; // flag set if is recognizing face
 bool isThreadEnd = true;
-char curDir[1024]; // current dirtory
-char facebasePath[1024]; // facebase abbsolute path
-char ImagePath[1024];
 
 
 // face recognition thread procedure
@@ -163,6 +160,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
 	HDC hdc;
+	
+	// 自定义变量
+	char curDir[256];
+	char facebasePath[256];
 
 	switch (message) 
 	{
@@ -197,7 +198,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			if ( !FaceCbcrProc() )
 				break;
 
-			DeleteFace();
+			// 构造人脸库路径
+			strcpy(facebasePath, curDir);
+			strcat(facebasePath, "\\Facebase");
+			
+			DeleteFace(facebasePath);
 			break;
 
 		case IDM_CHOOSE:
@@ -343,13 +348,15 @@ LRESULT PASCAL FrameCallbackProc(HWND hwnd, LPVIDEOHDR lpVHdr)
 ************************************************************************************************/
 DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 {
-	char facebasePath[1024];
+	char imgFileName[256];
+	char facebasePath[256];
+	BmpImage image;
 
 	isThreadEnd = false;
-	if ( !ReadBmpFile(ImagePath, Image) )
+	if ( !ReadBmpFile(imgFileName, &image) )
 		// Register a frame callback function with the capture window
 		capSetCallbackOnFrame(hwndCap, FrameCallbackProc);
-//	ShowBmpImage(Image, ImageWidth, ImageHeight, 665, 20);
+//	ShowBmpImage(&Image, 665, 20);
 
 	if ( isRecognition )
 	{
@@ -357,7 +364,7 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 		strcat(facebasePath, "\\Facebase");
 		
 		// 人脸库中查找目标人脸
-		if ( RecognizeFace(Image, ImageWidth, ImageHeight, facebasePath) )
+		if ( RecognizeFace(&image, facebasePath) )
 		{
 			// disable frame callback function to end entering face
 			capSetCallbackOnFrame(hwndCap, NULL);
@@ -377,7 +384,7 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 	}
 	else // if ( is Recognition == false )
 	{
-		if ( !ExtractFace(Image, ImageWidth, ImageHeight, FaceWidth, FaceHeight) )
+		if ( !ExtractFace(&faceImage, &image) )
 		{
 			// Register a frame callback function with the capture window
 			capSetCallbackOnFrame(hwndCap, FrameCallbackProc);
@@ -386,8 +393,8 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 		}
 
 		// normalize face image to 70 70 size
-		NormalizeImageSize(NewImage, 70, 70, Image, FaceWidth, FaceHeight);
-		ShowBmpImage(NewImage, 70, 70, 770, 200);
+		NormalizeImageSize(&faceImage, &image, 70, 70);
+		ShowBmpImage(&faceImage, 770, 200);
 
 		int rtn = MessageBox(hMainWnd, "是，则录入人脸样本？否，则捕获新人脸", "Entering Face", MB_YESNOCANCEL);
 		if (  rtn == IDNO )
@@ -403,7 +410,7 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 			strcat(facebasePath, "\\Facebase");
 			
 			// 人脸图像保存入库
-			if ( EnterFace(ImagePath, facebasePath) )
+			if ( EnterFace(imgFileName, facebasePath) )
 				MessageBox(hMainWnd, "录入成功！", "Entering Face", 0);
 		}
 		else // disable frame callback function to end entering face
@@ -429,6 +436,7 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 void ChooseImageToRecognizeFace()
 {
 	char imgFileName[256];
+	BmpImage image;
 	
 	//隐藏视频捕获窗口
 	ShowWindow(hwndCap, SW_HIDE);
@@ -440,15 +448,15 @@ void ChooseImageToRecognizeFace()
 		goto STOP_RECOGNIZING;
 	
 	OpenImageFile("选择搜索目标人脸图像", imgFileName);
-	if ( !strlen(imgFileName) || !ReadBmpFile(imgFileName, Image) )
+	if ( !strlen(imgFileName) || !ReadBmpFile(imgFileName, &image) )
 		goto STOP_RECOGNIZING;
-	ShowBmpImage(Image, ImageWidth, ImageHeight, 300, 200);
+	ShowBmpImage(&Image, 300, 200);
 	
 	strcpy(facebasePath, curDir);
 	strcat(facebasePath, "\\Facebase");
 	
 	// 在人脸库中查找目标人脸
-	if ( RecognizeFace(Image, ImageWidth, ImageHeight, facebasePath) )
+	if ( RecognizeFace(&image, facebasePath) )
 		MessageBox(hMainWnd, "匹配成功！", "人脸识别", 0);
 	else 
 		MessageBox(hMainWnd, "匹配失败！", "人脸识别", 0);
