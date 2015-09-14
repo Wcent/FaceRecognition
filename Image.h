@@ -12,9 +12,9 @@ extern HDC hWinDC;
 #define MAX_IMAGE_HEIGHT	240
 
 
-// 24ä½çœŸå½©è‰²ä½å›¾ç»“æ„å®šä¹‰
-// image[]ï¼šå­˜æ”¾BMPçœŸå®åƒç´ RBGæ•°æ®ï¼Œæœ€å¤§å¯æ”¾ï¼ˆMAX_IMAGE_WIDTH * MAX_IMAGE_HEIGHT * 3ï¼‰å­—èŠ‚
-// width & heightï¼šå­˜æ”¾BMPçœŸå®å°ºå¯¸
+// 24Î»Õæ²ÊÉ«Î»Í¼½á¹¹¶¨Òå
+// image[]£º´æ·ÅBMPÕæÊµÏñËØRBGÊı¾İ£¬×î´ó¿É·Å£¨MAX_IMAGE_WIDTH * MAX_IMAGE_HEIGHT * 3£©×Ö½Ú
+// width & height£º´æ·ÅBMPÕæÊµ³ß´ç
 typedef struct _BmpImage
 {
 	char image[MAX_IMAGE_WIDTH*MAX_IMAGE_HEIGHT*3];
@@ -24,37 +24,41 @@ typedef struct _BmpImage
 
 
 
-// è·å–é€‰æ‹©ç›®æ ‡æ–‡ä»¶å
+// »ñÈ¡Ñ¡ÔñÄ¿±êÎÄ¼şÃû
 void OpenImageFile(char *OPDLTitle, char *pImgFileName);
 
-// è¯»å–bmpå›¾åƒæ–‡ä»¶
+// ¶ÁÈ¡bmpÍ¼ÏñÎÄ¼ş
 BOOL ReadBmpFile(LPSTR imgFileName, BmpImage *oImage);
 
-// æ˜¾ç¤ºbmpå›¾åƒ
+// ÏÔÊ¾bmpÍ¼Ïñ
 void ShowBmpImage(BmpImage *pImage, int xPos, int yPos);
 
-// æ˜¾ç¤ºbmpç°åº¦å›¾åƒ
+// ÏÔÊ¾bmp»Ò¶ÈÍ¼Ïñ
 void ShowBmpGreyImage(BmpImage *pImage, int xPos, int yPos);
 
-// æ¸…é™¤å›¾åƒæ˜¾ç¤º
+// Çå³ıÍ¼ÏñÏÔÊ¾
 void CleanUpShowImage(int width, int height, int xPos, int yPos);
 
-// å›¾åƒå½’ä¸€åŒ–ï¼Œç¼©æ”¾åˆ°æŒ‡å®šå¤§å°
+// Í¼Ïñ³ß´çËõ·Å¹éÒ»»¯º¯Êı£¬×îÁÙ½ü²åÖµËã·¨Ëõ·ÅÏßĞÔ
+void NormalizeImageSize(char *pDstImageData, int dstWidth, int dstHeight,
+						char *pSrcImageData, int srcWidth, int srcHeight);
+
+// Í¼Ïñ¹éÒ»»¯£¬Ëõ·Åµ½Ö¸¶¨´óĞ¡
 void NormalizeImageSize( BmpImage *pDstImage, BmpImage *pSrcImage, int width, int height);
 
-// è¯†åˆ«äººè„¸ï¼Œåº“ä¸­æ‰¾å‡ºç›®æ ‡äººè„¸
+// Ê¶±ğÈËÁ³£¬¿âÖĞÕÒ³öÄ¿±êÈËÁ³
 bool RecognizeFace(BmpImage *pImage, char *facebasePath);
 
-// å¾—åˆ°äººè„¸è‚¤è‰²cbcr[cb][cr]å¯¹æ¯”åº“
-bool FaceCbcrProc();
+// µÃµ½ÈËÁ³·ôÉ«cbcr[cb][cr]¶Ô±È¿â
+bool FaceCbcrProc(char *sampleImagePath);
 
-// æå–äººè„¸
+// ÌáÈ¡ÈËÁ³
 bool ExtractFace(BmpImage *pFaceImage, BmpImage *pImage);
 
-// ç…§ç‰‡å½•å…¥äººè„¸åº“
+// ÕÕÆ¬Â¼ÈëÈËÁ³¿â
 bool EnterFace(char *imgFileName, char *facebasePath);
 
-// ç§»é™¤äººè„¸å–æ ·
+// ÒÆ³ıÈËÁ³È¡Ñù
 void DeleteFace(char *facebasePath);
 
 

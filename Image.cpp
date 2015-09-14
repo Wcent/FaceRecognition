@@ -190,7 +190,9 @@ BOOL ReadBmpFile(LPSTR imgFileName, BmpImage *oImage)
 	oImage->width = 320;
 	oImage->height = 240;
 	//图像缩放归一化
-	NormalizeImageSize(oImage, oImage.width, oImage.height, 
+//	NormalizeImageSize(oImage, oImage->width, oImage->height, 
+//						pTmpImgData, biImage.biWidth, biImage.biHeight);
+	NormalizeImageSize(oImage->image, oImage->width, oImage->height, 
 						pTmpImgData, biImage.biWidth, biImage.biHeight);
 						
 	// 释放像素数据临时存储空间
@@ -296,6 +298,52 @@ void CleanUpShowImage(int width, int height, int xPos, int yPos)
 	}
 }
 
+/************************************************************************************************
+*																								*	
+*   图像尺寸缩放归一化函数，最临近插值算法缩放线性												*
+*                                                                                               *
+*   输入参数：pSrcImageData - 原始位图像素数据指针												*
+*              srcWidth     - 原始位图宽度														*
+*	           srcHeight    - 原始位图高度														*
+*              dstWidth     - 缩放后宽度														*
+*	           dstHeight    - 缩放后高度														*
+*   输出参数：pDstImageData - 目标位图像素数据指针												*
+*																								*
+************************************************************************************************/
+void NormalizeImageSize(char *pDstImageData, int dstWidth, int dstHeight,
+						char *pSrcImageData, int srcWidth, int srcHeight)
+{
+	int i, j;
+	int x, y;
+	double xRate, yRate;
+
+	// 缩放比例
+	xRate = (double)srcWidth/dstWidth;
+	yRate = (double)srcHeight/dstHeight;
+	for ( j=0; j<dstHeight; j++ )
+	{
+		// 映射到原srcHeight下标
+		y = (int)(j*yRate+0.5);
+		if ( y<0 )
+			y = 0;
+		else if ( y>=srcHeight )
+			y = srcHeight-1;
+
+		for ( i=0; i<dstWidth; i++ )
+		{
+			// 映射到原srcWidth下标
+			x = (int)(i*xRate+0.5);
+			if ( x<0 )
+				x = 0;
+			else if ( x>=srcWidth )
+				x = srcWidth-1;
+
+			pDstImageData[j*3*dstWidth+i*3+0] = pSrcImageData[y*3*srcWidth+x*3+0];
+			pDstImageData[j*3*dstWidth+i*3+1] = pSrcImageData[y*3*srcWidth+x*3+1];
+			pDstImageData[j*3*dstWidth+i*3+2] = pSrcImageData[y*3*srcWidth+x*3+2];
+		}
+	}
+}
 
 /************************************************************************************************
 *																								*	
@@ -443,17 +491,14 @@ static void FaceCbcr()
 *   输出参数：cbcr[][] - 人脸肤色CbCr范围统计库                							*
 *																						*
 ****************************************************************************************/
-bool FaceCbcrProc()
+bool FaceCbcrProc(char *sampleImagePath)
 {
 	OFSTRUCT of;
-	char sampleImagePath[256];
-	BmpImage image;
-
-	strcpy(sampleImagePath, curDir);
-	strcat(sampleImagePath, "\\FaceSample.bmp");		
+	BmpImage image;		
 
 	// 尝试打开文件，判断文件是否存在
-	// 返回负数文件不存在，存在时，关闭文件，返回已无效句柄
+	// 返回负数文件不存在，存在时，关闭文件，返回已无效句柄+	image	0x00157614 "烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫"
+
 	if ( OpenFile(sampleImagePath, &of, OF_EXIST) < 0 )
 	{
 		// 未找到肤色样本图时，直接由Cb，Cr肤色范围得到人脸肤色对比库
@@ -559,9 +604,9 @@ static bool SplitFace(BmpImage *pFaceImage, BmpImage *pImage)
 	}
 
 	// 得到y轴人脸开始下标
-	for ( heightStart=0; heightStart<pImage->height; height++ )
+	for ( heightStart=0; heightStart<pImage->height; heightStart++ )
 	{
-		if ( cj[height] > 0 )
+		if ( cj[heightStart] > 0 )
 			break;
 	}
 
@@ -889,7 +934,7 @@ static bool SearchFace(char *facebaseDir, int *dstLBP)
 		ShowBmpImage(&faceImage, 750, 20);
 		
 		// 色彩空间模型转换
-		RgbToYcbcr(faceImage, faceImage);
+		RgbToYcbcr(&faceImage, &faceImage);
 		ExtractImageLbp(&faceImage, LBP);
 		ShowBmpGreyImage(&faceImage, 750, 100);
 
@@ -1233,8 +1278,8 @@ void FilterNoise(BmpImage *pImage)
 			if ( y == 255 && flagVisited[i][j] == 0 )
 			{
 				count = 0;
-				iMin = width;
-				jMin = height;
+				iMin = pImage->width;
+				jMin = pImage->height;
 				iMax = 0;
 				jMax = 0;
 				
@@ -1274,7 +1319,7 @@ void FilterNoise(BmpImage *pImage)
 						n = jQue[head-1] + b[k];
 						
 						// 防止越界
-						if ( m<0 || m>=width || n<0 || n>=height )
+						if ( m<0 || m>=pImage->width || n<0 || n>=pImage->height )
 							continue;
 							
 						// 是否已访问过

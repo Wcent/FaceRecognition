@@ -163,7 +163,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	
 	// 自定义变量
 	char curDir[256];
-	char facebasePath[256];
+	char path[256];
+
+	// 得到当前目录
+	GetCurrentDirectory(256, curDir);
 
 	switch (message) 
 	{
@@ -175,8 +178,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 		case IDM_FACERECOGNITION:
 			isRecognition = true;
+
+			strcpy(path, curDir);
+			strcat(path, "\\FaceSample.bmp");
 			// 得到人脸肤色Cb，Cr对比库cbcr[cb][cr]
-			if ( !FaceCbcrProc() )
+			if ( !FaceCbcrProc(path) )
 				break;
 
 			// Register a frame callback function with the capture window
@@ -185,8 +191,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		case IDM_ENTERINGFACE:
 			isRecognition = false;
+			strcpy(path, curDir);
+			strcat(path, "\\FaceSample.bmp");
 			// 得到人脸肤色Cb，Cr对比库cbcr[cb][cr]
-			if ( !FaceCbcrProc() )
+			if ( !FaceCbcrProc(path) )
 				break;
 
 			// Register a frame callback function with the capture window
@@ -194,15 +202,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			break;
 
 		case IDM_DELETE:
+			strcpy(path, curDir);
+			strcat(path, "\\FaceSample.bmp");
 			// 得到人脸肤色Cb，Cr对比库cbcr[cb][cr]
-			if ( !FaceCbcrProc() )
+			if ( !FaceCbcrProc(path) )
 				break;
 
 			// 构造人脸库路径
-			strcpy(facebasePath, curDir);
-			strcat(facebasePath, "\\Facebase");
+			strcpy(path, curDir);
+			strcat(path, "\\Facebase");
 			
-			DeleteFace(facebasePath);
+			DeleteFace(path);
 			break;
 
 		case IDM_CHOOSE:
@@ -223,8 +233,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_CREATE:
 		hWinDC = GetDC(hWnd);
 		hMainWnd = hWnd;
-		// 得到当前目录
-		GetCurrentDirectory(1024, curDir);
 
 		// 创建capture窗口，捕获视频
 		hwndCap = capCreateCaptureWindow(
@@ -305,7 +313,10 @@ void ShowCaptureState()
 ************************************************************************************************/
 LRESULT PASCAL FrameCallbackProc(HWND hwnd, LPVIDEOHDR lpVHdr)
 {
+	char curDir[256];
+	char imagePath[256];
 	HANDLE hRecognitionThread; //handle of face recognition thread
+
 	if ( !hwnd )
 		return FALSE;
 
@@ -316,10 +327,12 @@ LRESULT PASCAL FrameCallbackProc(HWND hwnd, LPVIDEOHDR lpVHdr)
 // 旧线程结束标记后，再新开线程新处理
 	if ( isThreadEnd )
 	{
-		strcpy(ImagePath, curDir);
-		strcat(ImagePath, "\\FaceImage.bmp");
+		// 得到当前目录
+		GetCurrentDirectory(256, curDir);
+		strcpy(imagePath, curDir);
+		strcat(imagePath, "\\FaceImage.bmp");
 		// 保存当前帧图像到ImagePath的bmp文件中
-		capFileSaveDIB(hwnd, ImagePath);
+		capFileSaveDIB(hwnd, imagePath);
 
 		// disable frame callback function to end entering face
 		//	capSetCallbackOnFrame(hwndCap, NULL);
@@ -349,8 +362,14 @@ LRESULT PASCAL FrameCallbackProc(HWND hwnd, LPVIDEOHDR lpVHdr)
 DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 {
 	char imgFileName[256];
+	char curDir[256];
 	char facebasePath[256];
-	BmpImage image;
+	BmpImage image, faceImage;
+
+	// 得到当前目录
+	GetCurrentDirectory(256, curDir);
+	strcpy(imgFileName, curDir);
+	strcat(imgFileName, "\\FaceImage.bmp");
 
 	isThreadEnd = false;
 	if ( !ReadBmpFile(imgFileName, &image) )
@@ -436,6 +455,8 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 void ChooseImageToRecognizeFace()
 {
 	char imgFileName[256];
+	char curDir[256];
+	char path[256];
 	BmpImage image;
 	
 	//隐藏视频捕获窗口
@@ -443,20 +464,24 @@ void ChooseImageToRecognizeFace()
 	//设置帧图像捕获回调函数为空
 	capSetCallbackOnFrame(hwndCap, NULL);
 	
+	// 得到当前目录
+	GetCurrentDirectory(256, curDir);
+	strcpy(path, curDir);
+	strcat(path, "\\FaceSample.bmp");
 	// 得到人脸肤色Cb，Cr对比库cbcr[cb][cr]
-	if ( !FaceCbcrProc() )
+	if ( !FaceCbcrProc(path) )
 		goto STOP_RECOGNIZING;
 	
 	OpenImageFile("选择搜索目标人脸图像", imgFileName);
 	if ( !strlen(imgFileName) || !ReadBmpFile(imgFileName, &image) )
 		goto STOP_RECOGNIZING;
-	ShowBmpImage(&Image, 300, 200);
-	
-	strcpy(facebasePath, curDir);
-	strcat(facebasePath, "\\Facebase");
+	ShowBmpImage(&image, 300, 200);
+
+	strcpy(path, curDir);
+	strcat(path, "\\Facebase");
 	
 	// 在人脸库中查找目标人脸
-	if ( RecognizeFace(&image, facebasePath) )
+	if ( RecognizeFace(&image, path) )
 		MessageBox(hMainWnd, "匹配成功！", "人脸识别", 0);
 	else 
 		MessageBox(hMainWnd, "匹配失败！", "人脸识别", 0);
