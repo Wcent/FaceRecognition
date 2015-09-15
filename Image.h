@@ -13,11 +13,11 @@ extern HDC hWinDC;
 
 
 // 24位真彩色位图结构定义
-// image[]：存放BMP真实像素RBG数据，最大可放（MAX_IMAGE_WIDTH * MAX_IMAGE_HEIGHT * 3）字节
+// data[]：存放BMP真实像素RBG数据，最大可放（MAX_IMAGE_WIDTH * MAX_IMAGE_HEIGHT * 3）字节
 // width & height：存放BMP真实尺寸
 typedef struct _BmpImage
 {
-	char image[MAX_IMAGE_WIDTH*MAX_IMAGE_HEIGHT*3];
+	char data[MAX_IMAGE_WIDTH*MAX_IMAGE_HEIGHT*3];
 	int width;
 	int height;
 } BmpImage;

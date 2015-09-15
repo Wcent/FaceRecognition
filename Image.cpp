@@ -32,7 +32,7 @@ static void FaceCbcr();
 // 从YCbCr空间模型图像中检测出人脸
 static void FaceDetect(BmpImage *pImage);
 // 投影法分割人脸位置，投影肤色计算下标像素数
-static bool SplitFace(BmpImage *pFaceImage, BmpImage *pImage);
+static bool SplitFace(BmpImage *pFaceImage, BmpImage *pImage, BmpImage *pYcbcrImage);
 
 // 提取灰度图像纹理的LBP特征，统计LBP特征直方图表征人脸
 static void ExtractImageLbp(BmpImage *pImage, int *LBP );
@@ -192,7 +192,7 @@ BOOL ReadBmpFile(LPSTR imgFileName, BmpImage *oImage)
 	//图像缩放归一化
 //	NormalizeImageSize(oImage, oImage->width, oImage->height, 
 //						pTmpImgData, biImage.biWidth, biImage.biHeight);
-	NormalizeImageSize(oImage->image, oImage->width, oImage->height, 
+	NormalizeImageSize(oImage->data, oImage->width, oImage->height, 
 						pTmpImgData, biImage.biWidth, biImage.biHeight);
 						
 	// 释放像素数据临时存储空间
@@ -205,17 +205,17 @@ BOOL ReadBmpFile(LPSTR imgFileName, BmpImage *oImage)
 		for (j=0; j<oImage->width; j++)
 		{
 			// R
-			tmpPixel = oImage->image[i*oImage->width*3+j*3];
-			oImage->image[i*oImage->width*3+j*3] = oImage->image[(oImage->height-i-1)*oImage->width*3+j*3+2];
-			oImage->image[(oImage->height-i-1)*oImage->width*3+j*3+2] = tmpPixel;
+			tmpPixel = oImage->data[i*oImage->width*3+j*3];
+			oImage->data[i*oImage->width*3+j*3] = oImage->data[(oImage->height-i-1)*oImage->width*3+j*3+2];
+			oImage->data[(oImage->height-i-1)*oImage->width*3+j*3+2] = tmpPixel;
 			// G
-			tmpPixel = oImage->image[i*oImage->width*3+j*3+1];
-			oImage->image[i*oImage->width*3+j*3+1] = oImage->image[(oImage->height-i-1)*oImage->width*3+j*3+1];
-			oImage->image[(oImage->height-i-1)*oImage->width*3+j*3+1] = tmpPixel;
+			tmpPixel = oImage->data[i*oImage->width*3+j*3+1];
+			oImage->data[i*oImage->width*3+j*3+1] = oImage->data[(oImage->height-i-1)*oImage->width*3+j*3+1];
+			oImage->data[(oImage->height-i-1)*oImage->width*3+j*3+1] = tmpPixel;
 			// B
-			tmpPixel = oImage->image[i*oImage->width*3+j*3+2];
-			oImage->image[i*oImage->width*3+j*3+2] = oImage->image[(oImage->height-i-1)*oImage->width*3+j*3];
-			oImage->image[(oImage->height-i-1)*oImage->width*3+j*3] = tmpPixel;
+			tmpPixel = oImage->data[i*oImage->width*3+j*3+2];
+			oImage->data[i*oImage->width*3+j*3+2] = oImage->data[(oImage->height-i-1)*oImage->width*3+j*3];
+			oImage->data[(oImage->height-i-1)*oImage->width*3+j*3] = tmpPixel;
 		}
 	}
 
@@ -241,9 +241,9 @@ void ShowBmpImage(BmpImage *pImage, int xPos, int yPos)
 	{
 		for (j=0; j<pImage->width; j++) 
 		{
-			r = (BYTE) pImage->image[i*pImage->width*3+j*3]; 
-			g = (BYTE) pImage->image[i*pImage->width*3+j*3+1];
-			b = (BYTE) pImage->image[i*pImage->width*3+j*3+2];
+			r = (BYTE) pImage->data[i*pImage->width*3+j*3]; 
+			g = (BYTE) pImage->data[i*pImage->width*3+j*3+1];
+			b = (BYTE) pImage->data[i*pImage->width*3+j*3+2];
 			
 			SetPixel(hWinDC, j+xPos, i+yPos, RGB(r, g, b));
 		}
@@ -268,7 +268,7 @@ void ShowBmpGreyImage(BmpImage *pImage, int xPos, int yPos)
 	{
 		for (j=0; j<pImage->width; j++) 
 		{
-			y = (BYTE)pImage->image[i*pImage->width*3+j*3];
+			y = (BYTE)pImage->data[i*pImage->width*3+j*3];
 			SetPixel(hWinDC, j+xPos, i+yPos, RGB(y, y, y));
 		}
 	}
@@ -382,9 +382,9 @@ void NormalizeImageSize( BmpImage *pDstImage, BmpImage *pSrcImage, int width, in
 			else if ( x>=pSrcImage->width )
 				x = pSrcImage->width-1;
 
-			pDstImage->image[j*3*width+i*3+0] = pSrcImage->image[y*3*pSrcImage->width+x*3+0];
-			pDstImage->image[j*3*width+i*3+1] = pSrcImage->image[y*3*pSrcImage->width+x*3+1];
-			pDstImage->image[j*3*width+i*3+2] = pSrcImage->image[y*3*pSrcImage->width+x*3+2];
+			pDstImage->data[j*3*width+i*3+0] = pSrcImage->data[y*3*pSrcImage->width+x*3+0];
+			pDstImage->data[j*3*width+i*3+1] = pSrcImage->data[y*3*pSrcImage->width+x*3+1];
+			pDstImage->data[j*3*width+i*3+2] = pSrcImage->data[y*3*pSrcImage->width+x*3+2];
 		}
 	}
 	// 得到位图新尺寸
@@ -415,9 +415,9 @@ static void RgbToYcbcr(BmpImage *pDstImage, BmpImage *pSrcImage)
 	{
 		for ( i=0; i<pSrcImage->width; i++ )
 		{
-			r = (BYTE)pSrcImage->image[j*pSrcImage->width*3+i*3];
-			g = (BYTE)pSrcImage->image[j*pSrcImage->width*3+i*3+1];
-			b = (BYTE)pSrcImage->image[j*pSrcImage->width*3+i*3+2];
+			r = (BYTE)pSrcImage->data[j*pSrcImage->width*3+i*3];
+			g = (BYTE)pSrcImage->data[j*pSrcImage->width*3+i*3+1];
+			b = (BYTE)pSrcImage->data[j*pSrcImage->width*3+i*3+2];
 			
 			/*****************************************************************\
 			  RGB to YCbCr:
@@ -430,9 +430,9 @@ static void RgbToYcbcr(BmpImage *pDstImage, BmpImage *pSrcImage)
 			cb = (int)(128 + (-37.945*r - 74.494*g + 112.43*b) / 256);
 			cr = (int)(128 + (112.439*r - 94.154*g - 18.28*b) / 256);
 			
-			pDstImage->image[j*pDstImage->width*3+i*3] = y;
-			pDstImage->image[j*pDstImage->width*3+i*3+1] = cb;
-			pDstImage->image[j*pDstImage->width*3+i*3+2] = cr;
+			pDstImage->data[j*pDstImage->width*3+i*3] = y;
+			pDstImage->data[j*pDstImage->width*3+i*3+1] = cb;
+			pDstImage->data[j*pDstImage->width*3+i*3+2] = cr;
 		}
 	}
 }
@@ -454,9 +454,9 @@ static void FaceSampleCbcr(BmpImage *pImage)
 	{
 		for ( i=0; i<pImage->width; i++ )
 		{
-			y  = (BYTE)pImage->image[j*pImage->width*3+i*3];
-			cb = (BYTE)pImage->image[j*pImage->width*3+i*3+1];
-			cr = (BYTE)pImage->image[j*pImage->width*3+i*3+2];
+			y  = (BYTE)pImage->data[j*pImage->width*3+i*3];
+			cb = (BYTE)pImage->data[j*pImage->width*3+i*3+1];
+			cr = (BYTE)pImage->data[j*pImage->width*3+i*3+2];
 
 			// 落入肤色范围，标记对应cb，cr值
 			if ( cb>98 && cb<123 && cr>133 && cr<169 )
@@ -497,8 +497,7 @@ bool FaceCbcrProc(char *sampleImagePath)
 	BmpImage image;		
 
 	// 尝试打开文件，判断文件是否存在
-	// 返回负数文件不存在，存在时，关闭文件，返回已无效句柄+	image	0x00157614 "烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫烫"
-
+	// 返回负数文件不存在，存在时，关闭文件，返回已无效句柄
 	if ( OpenFile(sampleImagePath, &of, OF_EXIST) < 0 )
 	{
 		// 未找到肤色样本图时，直接由Cb，Cr肤色范围得到人脸肤色对比库
@@ -533,9 +532,9 @@ void FaceDetect(BmpImage *pImage)
 	{
 		for ( i=0; i<pImage->width; i++ )
 		{
-			y = (BYTE)pImage->image[j*pImage->width*3+i*3];
-			cb = (BYTE)pImage->image[j*pImage->width*3+i*3+1];
-			cr = (BYTE)pImage->image[j*pImage->width*3+i*3+2];
+			y = (BYTE)pImage->data[j*pImage->width*3+i*3];
+			cb = (BYTE)pImage->data[j*pImage->width*3+i*3+1];
+			cr = (BYTE)pImage->data[j*pImage->width*3+i*3+2];
 
 			// 肤色范围
 		//	if ( cb>98 && cb<123 && cr>133 && cr<169 )
@@ -546,9 +545,9 @@ void FaceDetect(BmpImage *pImage)
 			else
 				y = 0; //black
 
-			pImage->image[j*pImage->width*3+i*3] = y;
-			pImage->image[j*pImage->width*3+i*3+1] = cb;
-			pImage->image[j*pImage->width*3+i*3+2] = cr;
+			pImage->data[j*pImage->width*3+i*3] = y;
+			pImage->data[j*pImage->width*3+i*3+1] = cb;
+			pImage->data[j*pImage->width*3+i*3+2] = cr;
 		}
 	}
 }
@@ -558,11 +557,12 @@ void FaceDetect(BmpImage *pImage)
 *	投影法分割人脸位置函数                                                               *
 *   肤色像素投影到x，y轴上，统计到对应下标肤色像素点数									 *
 *																						 *
-*   输入参数：pImage     - 肤色区域灰度值标记255的YCbCr位图结构指针						 *
-*   输出参数：pFaceImage - 人脸位图结构指针                       						 *
+*   输入参数：pSrcImage   - 原始位图结构指针						                     *
+*   输入参数：pYcbcrImage - 肤色区域灰度值标记255的YCbCr位图结构指针					 *
+*   输出参数：pFaceImage  - 人脸位图结构指针                       						 *
 *																						 *
 *****************************************************************************************/
-static bool SplitFace(BmpImage *pFaceImage, BmpImage *pImage)
+static bool SplitFace(BmpImage *pFaceImage, BmpImage *pSrcImage, BmpImage *pYcbcrImage)
 {
 	int i, j;
 	int y;
@@ -574,12 +574,12 @@ static bool SplitFace(BmpImage *pFaceImage, BmpImage *pImage)
 	memset(ci, 0, sizeof(ci));
 	memset(cj, 0, sizeof(cj));
 
-	for ( j=0; j<pImage->height; j++ )
+	for ( j=0; j<pYcbcrImage->height; j++ )
 	{
-		for ( i=0; i<pImage->width; i++ )
+		for ( i=0; i<pYcbcrImage->width; i++ )
 		{
 			// 取YCbCr位图灰度值
-			y = (BYTE)pImage->image[j*pImage->width*3+i*3];
+			y = (BYTE)pYcbcrImage->data[j*pYcbcrImage->width*3+i*3];
 
 			// 人脸肤色像素投影到两坐标轴上统计
 			if ( y == 255 )
@@ -591,27 +591,27 @@ static bool SplitFace(BmpImage *pFaceImage, BmpImage *pImage)
 	}
 
 	// 得到x轴人脸开始下标
-	for ( widthStart=0; widthStart<pImage->width; widthStart++ )
+	for ( widthStart=0; widthStart < pYcbcrImage->width; widthStart++ )
 	{
 		if ( ci[widthStart] > 0 )
 			break;
 	}
 	// 得到x轴人脸结束下标
-	for ( widthEnd=pImage->width-1; widthEnd>=0; widthEnd-- )
+	for ( widthEnd=pYcbcrImage->width-1; widthEnd>=0; widthEnd-- )
 	{
 		if ( ci[widthEnd] > 0 )
 			break;
 	}
 
 	// 得到y轴人脸开始下标
-	for ( heightStart=0; heightStart<pImage->height; heightStart++ )
+	for ( heightStart=0; heightStart < pYcbcrImage->height; heightStart++ )
 	{
 		if ( cj[heightStart] > 0 )
 			break;
 	}
 
 	// 得到y轴人脸结束下标
-	for ( heightEnd=pImage->height-1; heightEnd>=0; heightEnd-- )
+	for ( heightEnd=pYcbcrImage->height-1; heightEnd>=0; heightEnd-- )
 	{
 		if ( cj[heightEnd] > 0 )
 		{
@@ -637,14 +637,14 @@ static bool SplitFace(BmpImage *pFaceImage, BmpImage *pImage)
 	// 画出分割的人脸top/bottom width
 	for ( i=widthStart; i<widthEnd; i++ )
 	{
-	SetPixel(hWinDC, 680+i, 20+heightStart, RGB(255, 0, 0));
-	SetPixel(hWinDC, 680+i, 20+heightEnd, RGB(255, 0, 0));
+		SetPixel(hWinDC, 680+i, 20+heightStart, RGB(255, 0, 0));
+		SetPixel(hWinDC, 680+i, 20+heightEnd, RGB(255, 0, 0));
 	}
 	// 画出分割的人脸left/right height
 	for ( i=heightStart; i<heightEnd; i++ )
 	{
-	SetPixel(hWinDC, 680+widthStart, 20+i, RGB(255, 0, 0));
-	SetPixel(hWinDC, 680+widthEnd, 20+i, RGB(255, 0, 0));
+		SetPixel(hWinDC, 680+widthStart, 20+i, RGB(255, 0, 0));
+		SetPixel(hWinDC, 680+widthEnd, 20+i, RGB(255, 0, 0));
 	}
 */
 	// 得到人脸尺寸
@@ -656,12 +656,12 @@ static bool SplitFace(BmpImage *pFaceImage, BmpImage *pImage)
 	{
 		for ( i=widthStart; i<widthEnd; i++ )
 		{
-			pFaceImage->image[(j-heightStart)*(widthEnd-widthStart)*3+(i-widthStart)*3] 
-				= pImage->image[j*pImage->width*3+i*3];
-			pFaceImage->image[(j-heightStart)*(widthEnd-widthStart)*3+(i-widthStart)*3+1]
-				= pImage->image[j*pImage->width*3+i*3+1];
-			pFaceImage->image[(j-heightStart)*(widthEnd-widthStart)*3+(i-widthStart)*3+2]
-				= pImage->image[j*pImage->width*3+i*3+2];
+			pFaceImage->data[(j-heightStart)*(widthEnd-widthStart)*3+(i-widthStart)*3] 
+				= pSrcImage->data[j*pSrcImage->width*3+i*3];
+			pFaceImage->data[(j-heightStart)*(widthEnd-widthStart)*3+(i-widthStart)*3+1]
+				= pSrcImage->data[j*pSrcImage->width*3+i*3+1];
+			pFaceImage->data[(j-heightStart)*(widthEnd-widthStart)*3+(i-widthStart)*3+2]
+				= pSrcImage->data[j*pSrcImage->width*3+i*3+2];
 		}
 	}
 	return true;
@@ -793,7 +793,7 @@ static void ExtractImageLbp(BmpImage *pImage, int *LBP )
 
 	tmpImage = (char *)malloc(pImage->width*pImage->height*3);
 	// copy image信息到临时空间
-	memcpy(tmpImage, pImage->image, pImage->width*pImage->height*3);
+	memcpy(tmpImage, pImage->data, pImage->width*pImage->height*3);
 	
 	// 图像分块提取LBP，7*& blocks
 	blkCount = 7;
@@ -816,7 +816,7 @@ static void ExtractImageLbp(BmpImage *pImage, int *LBP )
 			//		lbp = MinLbp(lbp, 8);
 			
 					// LBP二值序列（LBP模式）对应的10进制数作LBP值
-					pImage->image[(blkHeight*n+j)*pImage->width*3+(blkWidth*m+i)*3] = lbp;
+					pImage->data[(blkHeight*n+j)*pImage->width*3+(blkWidth*m+i)*3] = lbp;
 
 					// 分类统计Uniform LBP直方图，58( p*(p-1)+2 )种ULBP
 					if ( ULBPtable[lbp] != -1 )
@@ -1002,19 +1002,21 @@ bool RecognizeFace(BmpImage *pImage, char *facebasePath)
 *****************************************************************************************/
 bool ExtractFace(BmpImage *pFaceImage, BmpImage *pImage)
 {
+	BmpImage ycbcrImage;
+	
 	// RGB色彩空间 --> YCbCr空间转换
-	RgbToYcbcr(pImage, pImage);
+	RgbToYcbcr(&ycbcrImage, pImage);
 	// 预处理YCbCr空间图像得到人脸候选区域的二值化图像
-	FaceDetect(pImage);
+	FaceDetect(&ycbcrImage);
 	
 	// 开运算处理，先腐蚀后膨胀
-	Erode(pImage);
-	Expand(pImage);
+	Erode(&ycbcrImage);
+	Expand(&ycbcrImage);
 	// 去掉非人脸噪音，默认像素数小于阈值时去掉
-	FilterNoise(pImage);
+	FilterNoise(&ycbcrImage);
 
 	// 分割人脸，投影法：人脸投影到width，height坐标上，得出下标位置
-	return SplitFace(pFaceImage, pImage);
+	return SplitFace(pFaceImage, pImage, &ycbcrImage);
 }
 
 /*****************************************************************************************
@@ -1164,7 +1166,7 @@ static void Expand(BmpImage *pImage)
 	char *tmpImage;
 
 	tmpImage = (char *)malloc(pImage->width*pImage->height*3);
-	memcpy(tmpImage, pImage->image, pImage->width*pImage->height*3);
+	memcpy(tmpImage, pImage->data, pImage->width*pImage->height*3);
 
 	for ( j=1; j<pImage->height-1; j++ )
 	{
@@ -1178,7 +1180,7 @@ static void Expand(BmpImage *pImage)
 					if ( B[m+n] == 1 )
 						continue;
 						
-					coff = (BYTE)pImage->image[(j+m-1)*pImage->width*3+(i+n-1)*3];
+					coff = (BYTE)pImage->data[(j+m-1)*pImage->width*3+(i+n-1)*3];
 					if ( coff == 255 )
 					{
 						tmpImage[j*pImage->width*3+i*3] = (char)255;
@@ -1190,7 +1192,7 @@ static void Expand(BmpImage *pImage)
 EXPAND_BREAK_I_LOOP: ;
 		}
 	}
-	memcpy(pImage->image, tmpImage, pImage->width*pImage->height*3);
+	memcpy(pImage->data, tmpImage, pImage->width*pImage->height*3);
 	free(tmpImage);
 }
 
@@ -1212,7 +1214,7 @@ static void Erode(BmpImage *pImage)
 	char *tmpImage;
 
 	tmpImage = (char *)malloc(pImage->width*pImage->height*3);
-	memcpy(tmpImage, pImage->image, pImage->width*pImage->height*3);
+	memcpy(tmpImage, pImage->data, pImage->width*pImage->height*3);
 
 	for ( j=1; j<pImage->height-1; j++ )
 	{
@@ -1226,7 +1228,7 @@ static void Erode(BmpImage *pImage)
 					if ( B[m+n] == 1 )
 						continue;
 					
-					coff = (BYTE)pImage->image[(j+m-1)*pImage->width*3+(i+n-1)*3];
+					coff = (BYTE)pImage->data[(j+m-1)*pImage->width*3+(i+n-1)*3];
 					if ( coff == 0 )
 					{
 						tmpImage[j*pImage->width*3+i*3] = (char)0;
@@ -1238,7 +1240,7 @@ static void Erode(BmpImage *pImage)
 ERODE__BREAK_I_LOOP: ;
 		}
 	}
-	memcpy(pImage->image, tmpImage, pImage->width*pImage->height*3);
+	memcpy(pImage->data, tmpImage, pImage->width*pImage->height*3);
 	free(tmpImage);
 }
 
@@ -1260,9 +1262,9 @@ void FilterNoise(BmpImage *pImage)
 	int iMin, iMax, jMin, jMax;   // 小块非人脸肤色区域最大范围
 	int tail, head;               // 队列首尾下标指针
 	
-	int iQue[320*240];            // 肤色像素点访问队列
-	int jQue[320*20];
-	int flagVisited[320][240] = {0};  // 像素点访问标志
+	int iQue[MAX_IMAGE_WIDTH*MAX_IMAGE_HEIGHT];            // 肤色像素点访问队列
+	int jQue[MAX_IMAGE_WIDTH*MAX_IMAGE_HEIGHT];
+	int flagVisited[MAX_IMAGE_WIDTH][MAX_IMAGE_HEIGHT] = {0};  // 像素点访问标志
 	
 	// 上下左右四周8个像素点的下标差值关系
 	int a[8] = {0, 1, 1, 1, 0, -1, -1, -1};
@@ -1272,7 +1274,7 @@ void FilterNoise(BmpImage *pImage)
 	{
 		for ( i=0; i<pImage->width; i++ )
 		{
-			y = (BYTE)pImage->image[j*pImage->width*3+i*3];
+			y = (BYTE)pImage->data[j*pImage->width*3+i*3];
 			
 			// 找第一个肤色像素点，开始广搜计数
 			if ( y == 255 && flagVisited[i][j] == 0 )
@@ -1327,7 +1329,7 @@ void FilterNoise(BmpImage *pImage)
 							continue;
 							
 						// 是否为肤色像素
-						y = (BYTE)pImage->image[n*pImage->width*3+m*3];
+						y = (BYTE)pImage->data[n*pImage->width*3+m*3];
 						if ( y != 255 )
 							continue;
 							
@@ -1344,7 +1346,7 @@ void FilterNoise(BmpImage *pImage)
 				{
 					for ( n=jMin; n<=jMax; n++ )
 						for ( m=iMin; m<=iMax; m++ )
-							pImage->image[n*pImage->width*3+m*3] = 0;
+							pImage->data[n*pImage->width*3+m*3] = 0;
 				}
 			} // end if ( y == 255 && flagVisited[i][j] == 0 )
 		} // end for i
