@@ -360,6 +360,11 @@ void NormalizeImageSize( BmpImage *pDstImage, BmpImage *pSrcImage, int width, in
 	int i, j;
 	int x, y;
 	double xRate, yRate;
+	char *tmpData;
+
+	tmpData = (char *)malloc(width*height*3);
+	if (tmpData == NULL)
+		return ;
 
 	// 缩放比例
 	xRate = (double)pSrcImage->width/width;
@@ -382,14 +387,16 @@ void NormalizeImageSize( BmpImage *pDstImage, BmpImage *pSrcImage, int width, in
 			else if ( x>=pSrcImage->width )
 				x = pSrcImage->width-1;
 
-			pDstImage->data[j*3*width+i*3+0] = pSrcImage->data[y*3*pSrcImage->width+x*3+0];
-			pDstImage->data[j*3*width+i*3+1] = pSrcImage->data[y*3*pSrcImage->width+x*3+1];
-			pDstImage->data[j*3*width+i*3+2] = pSrcImage->data[y*3*pSrcImage->width+x*3+2];
+			tmpData[j*3*width+i*3+0] = pSrcImage->data[y*3*pSrcImage->width+x*3+0];
+			tmpData[j*3*width+i*3+1] = pSrcImage->data[y*3*pSrcImage->width+x*3+1];
+			tmpData[j*3*width+i*3+2] = pSrcImage->data[y*3*pSrcImage->width+x*3+2];
 		}
 	}
 	// 得到位图新尺寸
 	pDstImage->width = width;
 	pDstImage->height = height;
+	memcpy(pDstImage->data, tmpData, width*height*3);
+	free(tmpData);
 }
 
 /****************************************************************************************************
@@ -618,20 +625,20 @@ static bool SplitFace(BmpImage *pFaceImage, BmpImage *pSrcImage, BmpImage *pYcbc
 			double rate;
 		
 			// 人脸长宽比例
-			if ( widthEnd - widthStart < 0 )
+			if ( widthEnd - widthStart > 0 )
 				rate = 1.0*(heightEnd-heightStart)/(widthEnd-widthStart);
 			else
 				return false;
 
 			// 人脸长宽比例不在普遍范围内，作适当调整
-			if ( rate < 0.5 && rate > 1.3 )
+			if ( rate < 0.5 || rate > 1.3 )
 				heightEnd = heightStart+(int)(1.2*(widthEnd-widthStart));
 			break;
 		}
 	}
 
 	// 人脸范围是否非法
-	if ( !(widthStart>=0 && widthStart<widthEnd && heightStart>=0 && heightStart<heightEnd) )
+	if ( !(widthStart>=0 && widthStart<widthEnd && heightStart>=0 && heightStart<heightEnd && heightEnd<pYcbcrImage->height) )
 		return false;
 /*
 	// 画出分割的人脸top/bottom width
@@ -895,7 +902,7 @@ static bool SearchFace(char *facebaseDir, int *dstLBP)
 	char findFileName[256];
 	char strFilter[256];
 	char findFilePath[256];
-	BmpImage image, faceImage;
+	BmpImage *image, *faceImage;
 	WIN32_FIND_DATA findFileData;
 	HANDLE hFindFile;
 	int LBP[49*59];
@@ -909,6 +916,18 @@ static bool SearchFace(char *facebaseDir, int *dstLBP)
 	// 当前目录是否存在
 	if ( hFindFile == INVALID_HANDLE_VALUE )
 		return false;
+
+	image = (BmpImage *)malloc(sizeof(BmpImage));
+	if (image == NULL)
+		return false;
+
+	faceImage = (BmpImage *)malloc(sizeof(BmpImage));
+	if (faceImage == NULL)
+	{
+		free(image);
+		return false;
+	}
+
 	do
 	{
 		// 忽略目录
@@ -924,19 +943,19 @@ static bool SearchFace(char *facebaseDir, int *dstLBP)
 		strcpy(findFilePath, facebaseDir);
 		strcat(findFilePath, "\\");
 		strcat(findFilePath, findFileName);
-		ReadBmpFile(findFilePath, &image);
+		ReadBmpFile(findFilePath, image);
 		
-		if ( !ExtractFace(&faceImage, &image) )
+		if ( !ExtractFace(faceImage, image) )
 			continue;
 			
 		// 人脸位图尺寸缩放到70*70
-		NormalizeImageSize(&faceImage, &image, 70, 70);
-		ShowBmpImage(&faceImage, 750, 20);
+		NormalizeImageSize(faceImage, faceImage, 70, 70);
+		ShowBmpImage(faceImage, 750, 20);
 		
 		// 色彩空间模型转换
-		RgbToYcbcr(&faceImage, &faceImage);
-		ExtractImageLbp(&faceImage, LBP);
-		ShowBmpGreyImage(&faceImage, 750, 100);
+		RgbToYcbcr(faceImage, faceImage);
+		ExtractImageLbp(faceImage, LBP);
+		ShowBmpGreyImage(faceImage, 750, 100);
 
 		int x2;
 		// LBP卡方统计相似度量值与设定阈值对比，小于默认阈值时，图像相同
@@ -946,15 +965,19 @@ static bool SearchFace(char *facebaseDir, int *dstLBP)
 			
 			wsprintf(strx2, "%s%d", "x^2 = ", x2);
 			TextOut(hWinDC, 700, 180, strx2, strlen(strx2));
-			ReadBmpFile(findFilePath, &image);
-			ShowBmpImage(&image, 660, 200);
+			ReadBmpFile(findFilePath, image);
+			ShowBmpImage(image, 660, 200);
 			
 			FindClose(hFindFile);
+			free(image);
+			free(faceImage);
 			return true;
 		}
 
 	} while ( FindNextFile(hFindFile, &findFileData) );
 	FindClose(hFindFile);
+	free(image);
+	free(faceImage);
 
 	// Update Show Rect()
 	RECT rt;
@@ -983,7 +1006,7 @@ bool RecognizeFace(BmpImage *pImage, char *facebasePath)
 		return false;
 
 	// normalize face image to 70 70 size
-	NormalizeImageSize(&faceImage, pImage, 70, 70);
+	NormalizeImageSize(&faceImage, &faceImage, 70, 70);
 	ShowBmpImage(&faceImage, 660, 20);
 	RgbToYcbcr(&faceImage, &faceImage);
 	ExtractImageLbp(&faceImage, dstLBP);
@@ -1002,21 +1025,29 @@ bool RecognizeFace(BmpImage *pImage, char *facebasePath)
 *****************************************************************************************/
 bool ExtractFace(BmpImage *pFaceImage, BmpImage *pImage)
 {
-	BmpImage ycbcrImage;
+	BmpImage *ycbcrImage;
+	bool rtnVal;
 	
+	ycbcrImage = (BmpImage *)malloc(sizeof(BmpImage));
+	if (ycbcrImage == NULL)
+		return false;
+
 	// RGB色彩空间 --> YCbCr空间转换
-	RgbToYcbcr(&ycbcrImage, pImage);
+	RgbToYcbcr(ycbcrImage, pImage);
 	// 预处理YCbCr空间图像得到人脸候选区域的二值化图像
-	FaceDetect(&ycbcrImage);
+	FaceDetect(ycbcrImage);
 	
 	// 开运算处理，先腐蚀后膨胀
-	Erode(&ycbcrImage);
-	Expand(&ycbcrImage);
+	Erode(ycbcrImage);
+	Expand(ycbcrImage);
+
 	// 去掉非人脸噪音，默认像素数小于阈值时去掉
-	FilterNoise(&ycbcrImage);
+	FilterNoise(ycbcrImage);
 
 	// 分割人脸，投影法：人脸投影到width，height坐标上，得出下标位置
-	return SplitFace(pFaceImage, pImage, &ycbcrImage);
+	rtnVal = SplitFace(pFaceImage, pImage, ycbcrImage);
+	free(ycbcrImage);
+	return rtnVal;
 }
 
 /*****************************************************************************************
@@ -1253,7 +1284,7 @@ ERODE__BREAK_I_LOOP: ;
 *   输入输出参数：pImage  - 位图结构指针                               					 *
 *																						 *	
 *****************************************************************************************/
-void FilterNoise(BmpImage *pImage)
+static void FilterNoise(BmpImage *pImage)
 {
 	int i, j, k;
 	int y;
@@ -1262,14 +1293,34 @@ void FilterNoise(BmpImage *pImage)
 	int iMin, iMax, jMin, jMax;   // 小块非人脸肤色区域最大范围
 	int tail, head;               // 队列首尾下标指针
 	
-	int iQue[MAX_IMAGE_WIDTH*MAX_IMAGE_HEIGHT];            // 肤色像素点访问队列
-	int jQue[MAX_IMAGE_WIDTH*MAX_IMAGE_HEIGHT];
-	int flagVisited[MAX_IMAGE_WIDTH][MAX_IMAGE_HEIGHT] = {0};  // 像素点访问标志
+	int *iQue;            // 肤色像素点访问队列
+	int *jQue;
+	char *flagVisited;  // 像素点访问标志
 	
 	// 上下左右四周8个像素点的下标差值关系
 	int a[8] = {0, 1, 1, 1, 0, -1, -1, -1};
 	int b[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
 
+	iQue = (int *)malloc(pImage->width*pImage->height*sizeof(int));
+	if ( iQue == NULL )
+		return ;
+
+	jQue = (int *)malloc(pImage->width*pImage->height*sizeof(int));
+	if ( jQue == NULL )
+	{
+		free(iQue);
+		return ;
+	}
+
+	flagVisited = (char *)malloc(pImage->width*pImage->height);
+	if ( flagVisited == NULL )
+	{
+		free(iQue);
+		free(jQue);
+		return ;
+	}
+
+	memset(flagVisited, '0', pImage->width*pImage->height);
 	for ( j=0; j<pImage->height; j++ )
 	{
 		for ( i=0; i<pImage->width; i++ )
@@ -1277,7 +1328,7 @@ void FilterNoise(BmpImage *pImage)
 			y = (BYTE)pImage->data[j*pImage->width*3+i*3];
 			
 			// 找第一个肤色像素点，开始广搜计数
-			if ( y == 255 && flagVisited[i][j] == 0 )
+			if ( y == 255 && flagVisited[j*pImage->width+i] == '0' )
 			{
 				count = 0;
 				iMin = pImage->width;
@@ -1293,7 +1344,7 @@ void FilterNoise(BmpImage *pImage)
 				iQue[tail] = i;
 				jQue[tail++] = j;
 				// 标记访问记录
-				flagVisited[i][j] = 1;
+				flagVisited[j*pImage->width+i] = '1';
 				
 				// 循环条件队列非空
 				while ( head < tail )
@@ -1325,7 +1376,7 @@ void FilterNoise(BmpImage *pImage)
 							continue;
 							
 						// 是否已访问过
-						if ( flagVisited[m][n] == 1 )
+						if ( flagVisited[n*pImage->width+m] == '1' )
 							continue;
 							
 						// 是否为肤色像素
@@ -1337,7 +1388,7 @@ void FilterNoise(BmpImage *pImage)
 						iQue[tail] = m;
 						jQue[tail++] = n;
 						// 标记访问记录
-						flagVisited[m][n] = 1;
+						flagVisited[n*pImage->width+m] = '1';
 					}
 				} // end while ( head < tail )
 
@@ -1348,7 +1399,11 @@ void FilterNoise(BmpImage *pImage)
 						for ( m=iMin; m<=iMax; m++ )
 							pImage->data[n*pImage->width*3+m*3] = 0;
 				}
-			} // end if ( y == 255 && flagVisited[i][j] == 0 )
+			} // end if ( y == 255 && flagVisited[i][j] == '0' )
 		} // end for i
 	} // end for j
+
+	free(iQue);
+	free(jQue);
+	free(flagVisited);
 }

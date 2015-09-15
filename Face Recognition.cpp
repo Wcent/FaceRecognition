@@ -27,6 +27,7 @@ HWND hwndCap; // handle of capture window
 CAPDRIVERCAPS capDrvCaps; // driver capabilities
 bool isRecognition = false; // flag set if is recognizing face
 bool isThreadEnd = true;
+char curDir[256];   
 
 
 // face recognition thread procedure
@@ -162,11 +163,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	HDC hdc;
 	
 	// 自定义变量
-	char curDir[256];
 	char path[256];
-
-	// 得到当前目录
-	GetCurrentDirectory(256, curDir);
 
 	switch (message) 
 	{
@@ -233,6 +230,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_CREATE:
 		hWinDC = GetDC(hWnd);
 		hMainWnd = hWnd;
+
+		// 得到当前目录
+		GetCurrentDirectory(256, curDir);
 
 		// 创建capture窗口，捕获视频
 		hwndCap = capCreateCaptureWindow(
@@ -313,7 +313,6 @@ void ShowCaptureState()
 ************************************************************************************************/
 LRESULT PASCAL FrameCallbackProc(HWND hwnd, LPVIDEOHDR lpVHdr)
 {
-	char curDir[256];
 	char imagePath[256];
 	HANDLE hRecognitionThread; //handle of face recognition thread
 
@@ -327,8 +326,6 @@ LRESULT PASCAL FrameCallbackProc(HWND hwnd, LPVIDEOHDR lpVHdr)
 // 旧线程结束标记后，再新开线程新处理
 	if ( isThreadEnd )
 	{
-		// 得到当前目录
-		GetCurrentDirectory(256, curDir);
 		strcpy(imagePath, curDir);
 		strcat(imagePath, "\\FaceImage.bmp");
 		// 保存当前帧图像到ImagePath的bmp文件中
@@ -362,12 +359,9 @@ LRESULT PASCAL FrameCallbackProc(HWND hwnd, LPVIDEOHDR lpVHdr)
 DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 {
 	char imgFileName[256];
-	char curDir[256];
 	char facebasePath[256];
 	BmpImage image, faceImage;
 
-	// 得到当前目录
-	GetCurrentDirectory(256, curDir);
 	strcpy(imgFileName, curDir);
 	strcat(imgFileName, "\\FaceImage.bmp");
 
@@ -455,7 +449,6 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 void ChooseImageToRecognizeFace()
 {
 	char imgFileName[256];
-	char curDir[256];
 	char path[256];
 	BmpImage image;
 	
@@ -464,8 +457,6 @@ void ChooseImageToRecognizeFace()
 	//设置帧图像捕获回调函数为空
 	capSetCallbackOnFrame(hwndCap, NULL);
 	
-	// 得到当前目录
-	GetCurrentDirectory(256, curDir);
 	strcpy(path, curDir);
 	strcat(path, "\\FaceSample.bmp");
 	// 得到人脸肤色Cb，Cr对比库cbcr[cb][cr]

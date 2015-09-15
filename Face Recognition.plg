@@ -6,13 +6,7 @@
 --------------------Configuration: Face Recognition - Win32 Debug--------------------
 </h3>
 <h3>Command Lines</h3>
-Creating temporary file "C:\Users\Vincent\AppData\Local\Temp\RSPDB34.tmp" with contents
-[
-/nologo /MLd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /FR"Debug/" /Fp"Debug/Face Recognition.pch" /Yu"stdafx.h" /Fo"Debug/" /Fd"Debug/" /FD /GZ /c 
-"C:\Users\Vincent\Face Recognition\Face Recognition.cpp"
-]
-Creating command line "cl.exe @C:\Users\Vincent\AppData\Local\Temp\RSPDB34.tmp" 
-Creating temporary file "C:\Users\Vincent\AppData\Local\Temp\RSPDB35.tmp" with contents
+Creating temporary file "C:\Users\Vincent\AppData\Local\Temp\RSP2CEE.tmp" with contents
 [
 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /incremental:yes /pdb:"Debug/Face Recognition.pdb" /debug /machine:I386 /out:"Debug/Face Recognition.exe" /pdbtype:sept 
 ".\Debug\Face Recognition.obj"
@@ -20,10 +14,8 @@ kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32
 ".\Debug\StdAfx.obj"
 ".\Debug\Face Recognition.res"
 ]
-Creating command line "link.exe @C:\Users\Vincent\AppData\Local\Temp\RSPDB35.tmp"
+Creating command line "link.exe @C:\Users\Vincent\AppData\Local\Temp\RSP2CEE.tmp"
 <h3>Output Window</h3>
-Compiling...
-Face Recognition.cpp
 Linking...
 Creating command line "bscmake.exe /nologo /o"Debug/Face Recognition.bsc"  ".\Debug\StdAfx.sbr" ".\Debug\Face Recognition.sbr" ".\Debug\Image.sbr""
 Creating browse info file...
