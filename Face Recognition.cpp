@@ -10,7 +10,9 @@
 #include <commdlg.h> // common dialogs
 #include <vfw.h> // vedio for window library
 #pragma comment(lib, "vfw32.lib") // 解决link时project加入lib问题
-#include "image.h"
+#include "Image.h"
+#include "FaceDetect.h"
+#include "FaceRecognize.h"
 /*****************************************************************************************/
 
 #define MAX_LOADSTRING 100
@@ -439,7 +441,8 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 	}
 
 	FreeBmpImage(image);
-	FreeBmpImage(faceImage);
+	if( !isRecognition )
+		FreeBmpImage(faceImage);
 	isThreadEnd = true;
 //	MessageBox(NULL, "Leaving Face Recognition Thread", "Thread", NULL);
 	return 0;
@@ -468,8 +471,7 @@ void ChooseImageToRecognizeFace()
 		goto STOP_RECOGNIZING;
 	
 	OpenImageFile("选择搜索目标人脸图像", imgFileName);
-	image = ReadBmpFile(imgFileName);
-	if ( !strlen(imgFileName) || image == NULL )
+	if ( !strlen(imgFileName) || (image=ReadBmpFile(imgFileName)) == NULL )
 		goto STOP_RECOGNIZING;
 	ShowBmpImage(image, 300, 200);
 

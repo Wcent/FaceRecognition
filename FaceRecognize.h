@@ -1,4 +1,4 @@
-// FaceRecognize.hï¼šåŸºäºŽäººè„¸å›¾åƒçº¹ç†çš„LBPï¼ˆå±€éƒ¨äºŒå€¼æ¨¡å¼ï¼‰ç‰¹å¾è¿›è¡Œäººè„¸è¯†åˆ«ç›¸å…³å‡½æ•°å£°æ˜Ž
+// FaceRecognize.h£º»ùÓÚÈËÁ³Í¼ÏñÎÆÀíµÄLBP£¨¾Ö²¿¶þÖµÄ£Ê½£©ÌØÕ÷½øÐÐÈËÁ³Ê¶±ðÏà¹Øº¯ÊýÉùÃ÷
 // Copyright: cent
 // 2015.9.17
 // ~
@@ -8,13 +8,13 @@
 
 
 
-// è¯†åˆ«äººè„¸ï¼Œåº“ä¸­æ‰¾å‡ºç›®æ ‡äººè„¸
+// Ê¶±ðÈËÁ³£¬¿âÖÐÕÒ³öÄ¿±êÈËÁ³
 bool RecognizeFace(BmpImage *pImage, char *facebasePath);
 
-// ç…§ç‰‡å½•å…¥äººè„¸åº“
+// ÕÕÆ¬Â¼ÈëÈËÁ³¿â
 bool EnterFace(char *imgFileName, char *facebasePath);
 
-// ç§»é™¤äººè„¸å–æ ·
+// ÒÆ³ýÈËÁ³È¡Ñù
 void DeleteFace(char *facebasePath);
 
 

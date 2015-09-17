@@ -1,4 +1,4 @@
-// FaceDetect.hï¼šåŸºäºäººè„¸è‚¤è‰²è¿›è¡Œäººè„¸æ£€æµ‹ç›¸å…³å‡½æ•°å£°æ˜
+// FaceDetect.h£º»ùÓÚÈËÁ³·ôÉ«½øĞĞÈËÁ³¼ì²âÏà¹Øº¯ÊıÉùÃ÷
 // Copyright: cent
 // 2015.9.17
 // ~
@@ -8,11 +8,14 @@
 
 
 
-// å¾—åˆ°äººè„¸è‚¤è‰²cbcr[cb][cr]å¯¹æ¯”åº“
+// µÃµ½ÈËÁ³·ôÉ«cbcr[cb][cr]¶Ô±È¿â
 bool FaceCbcrProc(char *sampleImagePath);
 
-// æå–äººè„¸
-bool ExtractFace(BmpImage *pFaceImage, BmpImage *pImage);
+// RGBÉ«²Ê¿Õ¼äÄ£ĞÍ×ª»»µ½YCbCr¿Õ¼äÄ£ĞÍ
+void RgbToYcbcr(BmpImage *pDstImage, BmpImage *pSrcImage);
+
+// ÌáÈ¡ÈËÁ³
+BmpImage* ExtractFace(BmpImage *pImage);
 
 
 

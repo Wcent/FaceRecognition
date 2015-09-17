@@ -1,4 +1,4 @@
-// FaceDetect.cpp：基于人脸肤色进行人脸检测相关函数定义
+// FaceDetect.cpp������������ɫ�������������غ�������
 // Copyright: cent
 // 2015.9.17
 // ~
@@ -8,56 +8,52 @@
 #include "resource.h"
 #include <commdlg.h>
 #include <direct.h>
-#include <math.h>
 #include "image.h"
 #include "FaceDetect.h"
 
-int cbcr[256][256];    // 人脸肤色CbCr范围统计库
+int cbcr[256][256];    // ������ɫCbCr��Χͳ�ƿ�
 
 /************************************************************************************
-	静态函数声明
+	��̬��������
 
 ************************************************************************************/
-// RGB色彩空间模型转换到YCbCr空间模型
-static void RgbToYcbcr(BmpImage *pDstImage, BmpImage *pSrcImage);
-
-// 图片膨胀处理
+// ͼƬ���ʹ���
 static void Expand(BmpImage *pImage);
-// 图片腐蚀处理
+// ͼƬ��ʴ����
 static void Erode(BmpImage *pImage);
-// 过滤掉小块人脸候选区域背景噪音
+// ���˵�С��������ѡ���򱳾�����
 static void FilterNoise(BmpImage *pImage);
 
-// 处理FaceSample.bmp人脸肤色样本库
+// ����FaceSample.bmp������ɫ������
 static void FaceSampleCbcr(BmpImage *pImage);
-// 根据cb,cr肤色范围得到人脸肤色对比库
+// ����cb,cr��ɫ��Χ�õ�������ɫ�Աȿ�
 static void FaceCbcr();
-// 从YCbCr空间模型图像中检测出人脸
+// ��YCbCr�ռ�ģ��ͼ���м�������
 static void FaceDetect(BmpImage *pImage);
-// 投影法分割人脸
+// ͶӰ���ָ�����
 static BmpImage* SplitFace(BmpImage *pImage, BmpImage *pYcbcrImage);
 
 
 
 /****************************************************************************************************
 *																								    *	
-*   将位图RGB色彩空间模型转换到YCbCr色彩空间模型函数												*
+*   ��λͼRGBɫ�ʿռ�ģ��ת����YCbCrɫ�ʿռ�ģ�ͺ���												*
 *																								    *
-*   输入参数：pSrcImage - RGB色彩空间模型的原始位图结构指针										    *
-*   输出参数：pDstImage - YCbCr色彩空间模型的目标位图结构指针									    *
+*   ���������pSrcImage - RGBɫ�ʿռ�ģ�͵�ԭʼλͼ�ṹָ��										    *
+*   ���������pDstImage - YCbCrɫ�ʿռ�ģ�͵�Ŀ��λͼ�ṹָ��									    *
 *																									*
 ****************************************************************************************************/
-static void RgbToYcbcr(BmpImage *pDstImage, BmpImage *pSrcImage)
+void RgbToYcbcr(BmpImage *pDstImage, BmpImage *pSrcImage)
 {
 	int i, j;
 	int r, g, b;
 	int y, cr, cb;
 
-	// 得到位图尺寸
+	// �õ�λͼ�ߴ�
 	pDstImage->width = pSrcImage->width;
 	pDstImage->height = pSrcImage->height;
 
-	// 色彩空间模型转换
+	// ɫ�ʿռ�ģ��ת��
 	for ( j=0; j<pSrcImage->height; j++ )
 	{
 		for ( i=0; i<pSrcImage->width; i++ )
@@ -86,10 +82,10 @@ static void RgbToYcbcr(BmpImage *pDstImage, BmpImage *pSrcImage)
 
 /*****************************************************************************************
 *																						 *
-*   由人脸样本肤色位图FaceSample.bmp获取人脸肤色cbcr[cb][cr]对比库函数					 *
+*   ������������ɫλͼFaceSample.bmp��ȡ������ɫcbcr[cb][cr]�Աȿ⺯��					 *
 *																				 	     *
-*   输入参数：pImage   - YCbCr色彩空间模型的人脸样本肤色位图结构指针					 *
-*   输出参数：cbcr[][] - 人脸肤色CbCr范围统计库                							 *
+*   ���������pImage   - YCbCrɫ�ʿռ�ģ�͵�����������ɫλͼ�ṹָ��					 *
+*   ���������cbcr[][] - ������ɫCbCr��Χͳ�ƿ�                							 *
 *																						 *		
 *****************************************************************************************/
 static void FaceSampleCbcr(BmpImage *pImage)
@@ -105,7 +101,7 @@ static void FaceSampleCbcr(BmpImage *pImage)
 			cb = (BYTE)pImage->data[j*pImage->width*3+i*3+1];
 			cr = (BYTE)pImage->data[j*pImage->width*3+i*3+2];
 
-			// 落入肤色范围，标记对应cb，cr值
+			// �����ɫ��Χ����Ƕ�Ӧcb��crֵ
 			if ( cb>98 && cb<123 && cr>133 && cr<169 )
 			    cbcr[cb][cr] = 1;
 		}
@@ -114,17 +110,17 @@ static void FaceSampleCbcr(BmpImage *pImage)
 
 /****************************************************************************************
 *																						*
-*	直接由肤色cb,cr范围得到人脸肤色的cbcr[cb][cr]对比库函数								*
+*	ֱ���ɷ�ɫcb,cr��Χ�õ�������ɫ��cbcr[cb][cr]�Աȿ⺯��								*
 *																						*
-*   输出参数：cbcr[][] - 人脸肤色CbCr范围统计库                							*
+*   ���������cbcr[][] - ������ɫCbCr��Χͳ�ƿ�                							*
 *																						*
 ****************************************************************************************/
 static void FaceCbcr()
 {
 	int i, j;
 
-	// 肤色范围：98<cb<123 && 133<cr<169
-	// 标记人脸样本肤色对应cb，cr值
+	// ��ɫ��Χ��98<cb<123 && 133<cr<169
+	// �������������ɫ��Ӧcb��crֵ
 	for ( i=98; i<123; i++ )
 		for ( j=133; j<169; j++ )
 			cbcr[i][j] = 1;
@@ -132,10 +128,10 @@ static void FaceCbcr()
 
 /****************************************************************************************
 *																						*
-*	获取人脸肤色的cbcr[cb][cr]对比库函数												*
-*   人脸样本肤色位图FaceSample.bmp存在时，由样本获取，不存在时，直接由肤色范围取得      *
+*	��ȡ������ɫ��cbcr[cb][cr]�Աȿ⺯��												*
+*   ����������ɫλͼFaceSample.bmp����ʱ����������ȡ��������ʱ��ֱ���ɷ�ɫ��Χȡ��      *
 *																						*
-*   输出参数：cbcr[][] - 人脸肤色CbCr范围统计库                							*
+*   ���������cbcr[][] - ������ɫCbCr��Χͳ�ƿ�                							*
 *																						*
 ****************************************************************************************/
 bool FaceCbcrProc(char *sampleImagePath)
@@ -143,25 +139,25 @@ bool FaceCbcrProc(char *sampleImagePath)
 	OFSTRUCT of;
 	BmpImage *image;		
 
-	// 尝试打开文件，判断文件是否存在
-	// 返回负数文件不存在，存在时，关闭文件，返回已无效句柄
+	// ���Դ��ļ����ж��ļ��Ƿ����
+	// ���ظ����ļ������ڣ�����ʱ���ر��ļ�����������Ч���
 	if ( OpenFile(sampleImagePath, &of, OF_EXIST) < 0 )
 	{
-		// 未找到肤色样本图时，直接由Cb，Cr肤色范围得到人脸肤色对比库
+		// δ�ҵ���ɫ����ͼʱ��ֱ����Cb��Cr��ɫ��Χ�õ�������ɫ�Աȿ�
 		FaceCbcr();
 		return true;
 	}
 
-	// 打开FaceSample.bmp肤色样本图
-	image = ReadBmpFile(sampleImagePath)
+	// ��FaceSample.bmp��ɫ����ͼ
+	image = ReadBmpFile(sampleImagePath);
 	if ( image == NULL )
 		return false;
 
 	RgbToYcbcr(image, image);
-	// 由样本肤色Cb，Cr得到人脸肤色对比库
+	// ��������ɫCb��Cr�õ�������ɫ�Աȿ�
 	FaceSampleCbcr(image);
 	
-	// 释放ReadBmpFile动态生成的位图空间
+	// �ͷ�ReadBmpFile��̬���ɵ�λͼ�ռ�
 	FreeBmpImage(image);
 
 	return true;
@@ -169,9 +165,9 @@ bool FaceCbcrProc(char *sampleImagePath)
 
 /*****************************************************************************************
 *																						 *
-*	YCbCr空间检测出人脸候选区域函数，位图中肤色区域灰度值标记255（白色）	    		 *
+*	YCbCr�ռ����������ѡ��������λͼ�з�ɫ����Ҷ�ֵ���255����ɫ��	    		 *
 *																						 *
-*   输入输出参数：pImage - YCbCr色彩空间模型的位图结构指针     							 *
+*   �������������pImage - YCbCrɫ�ʿռ�ģ�͵�λͼ�ṹָ��     							 *
 *																						 *
 *****************************************************************************************/
 void FaceDetect(BmpImage *pImage)
@@ -187,10 +183,10 @@ void FaceDetect(BmpImage *pImage)
 			cb = (BYTE)pImage->data[j*pImage->width*3+i*3+1];
 			cr = (BYTE)pImage->data[j*pImage->width*3+i*3+2];
 
-			// 肤色范围
+			// ��ɫ��Χ
 		//	if ( cb>98 && cb<123 && cr>133 && cr<169 )
 
-			// 标记肤色像素
+			// ��Ƿ�ɫ����
 			if ( cbcr[cb][cr] == 1 )
 				y = 255; //white
 			else
@@ -205,12 +201,12 @@ void FaceDetect(BmpImage *pImage)
 
 /*****************************************************************************************
 *																						 *
-*	投影法分割人脸位置函数                                                               *
-*   肤色像素投影到x，y轴上，统计到对应下标肤色像素点数									 *
+*	ͶӰ���ָ�����λ�ú���                                                               *
+*   ��ɫ����ͶӰ��x��y���ϣ�ͳ�Ƶ���Ӧ�±��ɫ���ص���									 *
 *																						 *
-*   输入参数：pSrcImage   - 原始位图结构指针						                     *
-*   输入参数：pYcbcrImage - 肤色区域灰度值标记255的YCbCr位图结构指针					 *
-*   返回值  ：              指针人脸位图结构指针                   						 *
+*   ���������pSrcImage   - ԭʼλͼ�ṹָ��						                     *
+*   ���������pYcbcrImage - ��ɫ����Ҷ�ֵ���255��YCbCrλͼ�ṹָ��					 *
+*   ����ֵ  ��              ָ������λͼ�ṹָ��                   						 *
 *																						 *
 *****************************************************************************************/
 static BmpImage* SplitFace(BmpImage *pSrcImage, BmpImage *pYcbcrImage)
@@ -220,6 +216,7 @@ static BmpImage* SplitFace(BmpImage *pSrcImage, BmpImage *pYcbcrImage)
 	int widthStart, widthEnd, heightStart, heightEnd;
 	int *ci;
 	int *cj;
+	BmpImage *pFaceImage;
 
 	ci = (int *)malloc(pYcbcrImage->width*sizeof(int));
 	if( ci == NULL )
@@ -232,18 +229,18 @@ static BmpImage* SplitFace(BmpImage *pSrcImage, BmpImage *pYcbcrImage)
 		return NULL;
 	}
 	
-	// 初始化两坐标轴上肤色像素统计值
-	memset(ci, 0, sizeof(ci));
-	memset(cj, 0, sizeof(cj));
+	// ��ʼ�����������Ϸ�ɫ����ͳ��ֵ
+	memset(ci, 0, pYcbcrImage->width*sizeof(int));
+	memset(cj, 0, pYcbcrImage->height*sizeof(int));
 
 	for ( j=0; j<pYcbcrImage->height; j++ )
 	{
 		for ( i=0; i<pYcbcrImage->width; i++ )
 		{
-			// 取YCbCr位图灰度值
+			// ȡYCbCrλͼ�Ҷ�ֵ
 			y = (BYTE)pYcbcrImage->data[j*pYcbcrImage->width*3+i*3];
 
-			// 人脸肤色像素投影到两坐标轴上统计
+			// ������ɫ����ͶӰ������������ͳ��
 			if ( y == 255 )
 			{
 				ci[i]++;
@@ -252,34 +249,34 @@ static BmpImage* SplitFace(BmpImage *pSrcImage, BmpImage *pYcbcrImage)
 		}
 	}
 
-	// 得到x轴人脸开始下标
+	// �õ�x��������ʼ�±�
 	for ( widthStart=0; widthStart < pYcbcrImage->width; widthStart++ )
 	{
 		if ( ci[widthStart] > 0 )
 			break;
 	}
-	// 得到x轴人脸结束下标
+	// �õ�x�����������±�
 	for ( widthEnd=pYcbcrImage->width-1; widthEnd>=0; widthEnd-- )
 	{
 		if ( ci[widthEnd] > 0 )
 			break;
 	}
 
-	// 得到y轴人脸开始下标
+	// �õ�y��������ʼ�±�
 	for ( heightStart=0; heightStart < pYcbcrImage->height; heightStart++ )
 	{
 		if ( cj[heightStart] > 0 )
 			break;
 	}
 
-	// 得到y轴人脸结束下标
+	// �õ�y�����������±�
 	for ( heightEnd=pYcbcrImage->height-1; heightEnd>=0; heightEnd-- )
 	{
 		if ( cj[heightEnd] > 0 )
 		{
 			double rate;
 		
-			// 人脸长宽比例
+			// ������������
 			if ( widthEnd - widthStart > 0 )
 				rate = 1.0*(heightEnd-heightStart)/(widthEnd-widthStart);
 			else
@@ -289,14 +286,14 @@ static BmpImage* SplitFace(BmpImage *pSrcImage, BmpImage *pYcbcrImage)
 				return NULL;
 			}
 
-			// 人脸长宽比例不在普遍范围内，作适当调整
+			// �����������������ձ鷶Χ�ڣ����ʵ�����
 			if ( rate < 0.5 || rate > 1.3 )
 				heightEnd = heightStart+(int)(1.2*(widthEnd-widthStart));
 			break;
 		}
 	}
 
-	// 人脸范围是否非法
+	// ������Χ�Ƿ�Ƿ�
 	if ( !(widthStart>=0 && widthStart<widthEnd && 
 	      heightStart>=0 && heightStart<heightEnd && heightEnd<pYcbcrImage->height) )
 	{
@@ -305,20 +302,20 @@ static BmpImage* SplitFace(BmpImage *pSrcImage, BmpImage *pYcbcrImage)
 		return NULL;
 	}
 /*
-	// 画出分割的人脸top/bottom width
+	// �����ָ������top/bottom width
 	for ( i=widthStart; i<widthEnd; i++ )
 	{
 		SetPixel(hWinDC, 680+i, 20+heightStart, RGB(255, 0, 0));
 		SetPixel(hWinDC, 680+i, 20+heightEnd, RGB(255, 0, 0));
 	}
-	// 画出分割的人脸left/right height
+	// �����ָ������left/right height
 	for ( i=heightStart; i<heightEnd; i++ )
 	{
 		SetPixel(hWinDC, 680+widthStart, 20+i, RGB(255, 0, 0));
 		SetPixel(hWinDC, 680+widthEnd, 20+i, RGB(255, 0, 0));
 	}
 */
-	// 分配人脸位图结构，尺寸为：(widthEnd-widthStart) * (heightEnd-heightStart)
+	// ��������λͼ�ṹ���ߴ�Ϊ��(widthEnd-widthStart) * (heightEnd-heightStart)
 	pFaceImage = MallocBmpImage(widthEnd-widthStart, heightEnd-heightStart);
 	if(pFaceImage == NULL)
 	{
@@ -331,7 +328,7 @@ static BmpImage* SplitFace(BmpImage *pSrcImage, BmpImage *pYcbcrImage)
 	{
 		for ( i=widthStart; i<widthEnd; i++ )
 		{
-			// 分割出的人脸
+			// �ָ��������
 			pFaceImage->data[(j-heightStart)*(widthEnd-widthStart)*3+(i-widthStart)*3] 
 				= pSrcImage->data[j*pSrcImage->width*3+i*3];
 			pFaceImage->data[(j-heightStart)*(widthEnd-widthStart)*3+(i-widthStart)*3+1]
@@ -348,10 +345,10 @@ static BmpImage* SplitFace(BmpImage *pSrcImage, BmpImage *pYcbcrImage)
 
 /*****************************************************************************************
 *																						 *	
-*	提取人脸位图函数 																	 *
+*	��ȡ����λͼ���� 																	 *
 *																						 *
-*   输入参数：pImage       - 目标位图结构指针   	               						 *
-*   返回值  ：               指向尺寸为70*70的人脸位图指针               				 *
+*   ���������pImage       - Ŀ��λͼ�ṹָ��   	               						 *
+*   ����ֵ  ��               ָ��ߴ�Ϊ70*70������λͼָ��               				 *
 *																						 *	
 *****************************************************************************************/
 BmpImage* ExtractFace(BmpImage *pImage)
@@ -362,24 +359,24 @@ BmpImage* ExtractFace(BmpImage *pImage)
 	if (ycbcrImage == NULL)
 		return NULL;
 
-	// RGB色彩空间 --> YCbCr空间转换
+	// RGBɫ�ʿռ� --> YCbCr�ռ�ת��
 	RgbToYcbcr(ycbcrImage, pImage);
-	// 预处理YCbCr空间图像得到人脸候选区域的二值化图像
+	// Ԥ����YCbCr�ռ�ͼ��õ�������ѡ����Ķ�ֵ��ͼ��
 	FaceDetect(ycbcrImage);
 	
-	// 开运算处理，先腐蚀后膨胀
+	// �����㴦�����ȸ�ʴ������
 	Erode(ycbcrImage);
 	Expand(ycbcrImage);
 
-	// 去掉非人脸噪音，默认像素数小于阈值时去掉
+	// ȥ��������������Ĭ��������С����ֵʱȥ��
 	FilterNoise(ycbcrImage);
 
-	// 分割人脸，投影法：人脸投影到width，height坐标上，得出下标位置
+	// �ָ�������ͶӰ��������ͶӰ��width��height�����ϣ��ó��±�λ��
 	pFaceImage = SplitFace(pImage, ycbcrImage);
 	if( pFaceImage == NULL )
 		return NULL;
 	
-	// 人脸限定缩放尺寸为：70 * 70
+	// �����޶����ųߴ�Ϊ��70 * 70
 	NormalizeImageSize(pFaceImage, 70, 70);
 	
 	FreeBmpImage(ycbcrImage);
@@ -388,9 +385,9 @@ BmpImage* ExtractFace(BmpImage *pImage)
 
 /*****************************************************************************************
 *																						 *
-*	图片膨胀处理函数																	 *
+*	ͼƬ���ʹ�������																	 *
 *																						 *
-*   输入输出参数：pImage  - 位图结构指针                               					 *
+*   �������������pImage  - λͼ�ṹָ��                               					 *
 *																						 *
 *****************************************************************************************/
 static void Expand(BmpImage *pImage)
@@ -409,7 +406,7 @@ static void Expand(BmpImage *pImage)
 	{
 		for ( i=1; i<pImage->width-1; i++ )
 		{
-			// 上下左右中存在与目标灰度值255一致像素，同化当前像素，即膨胀
+			// ���������д�����Ŀ��Ҷ�ֵ255һ�����أ�ͬ����ǰ���أ�������
 			for ( m=0; m<3; m++ )
 			{
 				for ( n=0; n<3; n++ )
@@ -421,7 +418,7 @@ static void Expand(BmpImage *pImage)
 					if ( coff == 255 )
 					{
 						tmpImage[j*pImage->width*3+i*3] = (char)255;
-						// 继续处理下一个像素
+						// ����������һ������
 						goto EXPAND_BREAK_I_LOOP;
 					}
 				}
@@ -435,9 +432,9 @@ EXPAND_BREAK_I_LOOP: ;
 
 /*****************************************************************************************
 *																						 *
-*	图片腐蚀处理函数																	 *
+*	ͼƬ��ʴ��������																	 *
 *																						 *
-*   输入输出参数：pImage  - 位图结构指针                               					 *
+*   �������������pImage  - λͼ�ṹָ��                               					 *
 *																						 *
 *****************************************************************************************/
 static void Erode(BmpImage *pImage)
@@ -457,7 +454,7 @@ static void Erode(BmpImage *pImage)
 	{
 		for ( i=1; i<pImage->width-1; i++ )
 		{
-			// 上下左右中存在与背景灰度值0一致像素，同化当前像素，即腐蚀
+			// ���������д����뱳���Ҷ�ֵ0һ�����أ�ͬ����ǰ���أ�����ʴ
 			for ( m=0; m<3; m++ )
 			{
 				for ( n=0; n<3; n++ )
@@ -469,7 +466,7 @@ static void Erode(BmpImage *pImage)
 					if ( coff == 0 )
 					{
 						tmpImage[j*pImage->width*3+i*3] = (char)0;
-						// 继续处理下一个像素
+						// ����������һ������
 						goto ERODE__BREAK_I_LOOP;
 					}
 				}
@@ -483,27 +480,27 @@ ERODE__BREAK_I_LOOP: ;
 
 /*****************************************************************************************
 *                                                                                        *
-*	过滤背景噪音函数								                					 *
-*	肤色像素点数小于5000时，假定为非人脸区域											 *	
-*	用队列广度优先搜索的方式来统计肤色像素点数											 *
+*	���˱�����������								                					 *
+*	��ɫ���ص���С��5000ʱ���ٶ�Ϊ����������											 *	
+*	�ö��й�����������ķ�ʽ��ͳ�Ʒ�ɫ���ص���											 *
 *																						 *
-*   输入输出参数：pImage  - 位图结构指针                               					 *
+*   �������������pImage  - λͼ�ṹָ��                               					 *
 *																						 *	
 *****************************************************************************************/
 static void FilterNoise(BmpImage *pImage)
 {
 	int i, j, k;
 	int y;
-	int count;                    // 肤色像素点计数变量
+	int count;                    // ��ɫ���ص��������
 	int m, n;
-	int iMin, iMax, jMin, jMax;   // 小块非人脸肤色区域最大范围
-	int tail, head;               // 队列首尾下标指针
+	int iMin, iMax, jMin, jMax;   // С���������ɫ�������Χ
+	int tail, head;               // ������β�±�ָ��
 	
-	int *iQue;            // 肤色像素点访问队列
+	int *iQue;            // ��ɫ���ص���ʶ���
 	int *jQue;
-	char *flagVisited;  // 像素点访问标志
+	char *flagVisited;  // ���ص���ʱ�־
 	
-	// 上下左右四周8个像素点的下标差值关系
+	// ������������8�����ص���±��ֵ��ϵ
 	int a[8] = {0, 1, 1, 1, 0, -1, -1, -1};
 	int b[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
 
@@ -533,7 +530,7 @@ static void FilterNoise(BmpImage *pImage)
 		{
 			y = (BYTE)pImage->data[j*pImage->width*3+i*3];
 			
-			// 找第一个肤色像素点，开始广搜计数
+			// �ҵ�һ����ɫ���ص㣬��ʼ���Ѽ���
 			if ( y == 255 && flagVisited[j*pImage->width+i] == '0' )
 			{
 				count = 0;
@@ -542,25 +539,25 @@ static void FilterNoise(BmpImage *pImage)
 				iMax = 0;
 				jMax = 0;
 				
-				// 队列初始化
+				// ���г�ʼ��
 				head = 0;
 				tail = 0;
 				
-				// 当前第一个肤色像素点入队
+				// ��ǰ��һ����ɫ���ص����
 				iQue[tail] = i;
 				jQue[tail++] = j;
-				// 标记访问记录
+				// ��Ƿ��ʼ�¼
 				flagVisited[j*pImage->width+i] = '1';
 				
-				// 循环条件队列非空
+				// ѭ���������зǿ�
 				while ( head < tail )
 				{
 					count++;
-					// 队首出列
+					// ���׳���
 					m = iQue[head];
 					n = jQue[head++];
 					
-					// 更新最大范围
+					// �������Χ
 					if ( m > iMax )
 						iMax = m;
 					if ( m < iMin )
@@ -570,35 +567,35 @@ static void FilterNoise(BmpImage *pImage)
 					if ( n < jMin )
 						jMin = n;
 						
-					// 往四周8个像素点广搜
+					// ������8�����ص����
 					for ( k=0; k<8; k++ )
 					{
-						// 四周8个点下标位置
+						// ����8�����±�λ��
 						m = iQue[head-1] + a[k];
 						n = jQue[head-1] + b[k];
 						
-						// 防止越界
+						// ��ֹԽ��
 						if ( m<0 || m>=pImage->width || n<0 || n>=pImage->height )
 							continue;
 							
-						// 是否已访问过
+						// �Ƿ��ѷ��ʹ�
 						if ( flagVisited[n*pImage->width+m] == '1' )
 							continue;
 							
-						// 是否为肤色像素
+						// �Ƿ�Ϊ��ɫ����
 						y = (BYTE)pImage->data[n*pImage->width*3+m*3];
 						if ( y != 255 )
 							continue;
 							
-						// 队尾入列
+						// ��β����
 						iQue[tail] = m;
 						jQue[tail++] = n;
-						// 标记访问记录
+						// ��Ƿ��ʼ�¼
 						flagVisited[n*pImage->width+m] = '1';
 					}
 				} // end while ( head < tail )
 
-				// 过滤小块非人脸肤色区域，假定小于1000个像素点
+				// ����С���������ɫ���򣬼ٶ�С��1000�����ص�
 				if ( count < 1000 )
 				{
 					for ( n=jMin; n<=jMax; n++ )

@@ -1,4 +1,4 @@
-// FaceRecognize.cppï¼šåŸºäºäººè„¸å›¾åƒçº¹ç†çš„LBPï¼ˆå±€éƒ¨äºŒå€¼æ¨¡å¼ï¼‰ç‰¹å¾è¿›è¡Œäººè„¸è¯†åˆ«ç›¸å…³å‡½æ•°å®šä¹‰
+// FaceRecognize.cpp£º»ùÓÚÈËÁ³Í¼ÏñÎÆÀíµÄLBP£¨¾Ö²¿¶şÖµÄ£Ê½£©ÌØÕ÷½øĞĞÈËÁ³Ê¶±ğÏà¹Øº¯Êı¶¨Òå
 // Copyright: cent
 // 2015.9.17
 // ~
@@ -15,34 +15,34 @@
 
 
 /************************************************************************************
-	é™æ€å‡½æ•°å£°æ˜
+	¾²Ì¬º¯ÊıÉùÃ÷
 
 ************************************************************************************/
-// æå–ç°åº¦å›¾åƒçº¹ç†çš„LBPç‰¹å¾ï¼Œç»Ÿè®¡LBPç‰¹å¾ç›´æ–¹å›¾è¡¨å¾äººè„¸
+// ÌáÈ¡»Ò¶ÈÍ¼ÏñÎÆÀíµÄLBPÌØÕ÷£¬Í³¼ÆLBPÌØÕ÷Ö±·½Í¼±íÕ÷ÈËÁ³
 static void ExtractImageLbp(BmpImage *pImage, int *LBP );
-// å¡æ–¹ç»Ÿè®¡ä¸¤å›¾åƒLBPç›¸ä¼¼åº¦
+// ¿¨·½Í³¼ÆÁ½Í¼ÏñLBPÏàËÆ¶È
 static int ChiSquareStatistic(int *dstLBP, int *baseLBP, int len);
-// æŸ¥æ‰¾äººè„¸åº“ä¸­æ˜¯å¦å­˜åœ¨ç›®æ ‡äººè„¸
+// ²éÕÒÈËÁ³¿âÖĞÊÇ·ñ´æÔÚÄ¿±êÈËÁ³
 static bool SearchFace(char *facebaseDir, int *dstLBP);
 
 
 
 /***********************************************************************************
 *																				   *
-*	æå–ä½å›¾ä¸­ç¬¬(m,n)blockä¸­ç¬¬(i,j)åƒç´ ç‚¹åœ¨é¢†åŸŸå†…LBPå€¼å‡½æ•°         			  	   *
-*   å–åŠå¾„ä¸ºrçš„ç¯å½¢é¢†åŸŸä¸Šï¼Œåœ†å‘¨ä¸ŠPåƒç´ ç‚¹æ•°è®¡ç®—å…¶Uniform LBP                        *
-*   LBPæ¨¡å¼äºŒå€¼åºåˆ—ä¸­0->1æˆ–1->0å˜åŒ–æ¬¡æ•°å°äºç­‰äº2æ¬¡çš„ä¸ºUniform LBP                  *
+*	ÌáÈ¡Î»Í¼ÖĞµÚ(m,n)blockÖĞµÚ(i,j)ÏñËØµãÔÚÁìÓòÄÚLBPÖµº¯Êı         			  	   *
+*   È¡°ë¾¶ÎªrµÄ»·ĞÎÁìÓòÉÏ£¬Ô²ÖÜÉÏPÏñËØµãÊı¼ÆËãÆäUniform LBP                        *
+*   LBPÄ£Ê½¶şÖµĞòÁĞÖĞ0->1»ò1->0±ä»¯´ÎÊıĞ¡ÓÚµÈÓÚ2´ÎµÄÎªUniform LBP                  *
 *																				   *
-*   è¾“å…¥å‚æ•°ï¼šimage      - ä½å›¾åƒç´ æ•°æ®		                            		   *
-*             width      - ä½å›¾å®½åº¦                                                *
-*             height     - ä½å›¾é«˜åº¦                                                *
-*             m          - å—æ‰€åœ¨è¡Œå·                                              *
-*             n          - å—æ‰€åœ¨åˆ—å·                                              *
-*             blkWidth   - ä½å›¾åˆ†å—å®½åº¦                                            *
-*             blkHeight  - ä½å›¾åˆ†å—é«˜åº¦                                            *
-*             i          - å½“å‰å—åƒç´ è¡Œå·                                          *
-*             j          - å½“å‰å—åƒç´ åˆ—å·                                          *
-*   è¿”å›å€¼ï¼š  LBP                                                				   *
+*   ÊäÈë²ÎÊı£ºimage      - Î»Í¼ÏñËØÊı¾İ		                            		   *
+*             width      - Î»Í¼¿í¶È                                                *
+*             height     - Î»Í¼¸ß¶È                                                *
+*             m          - ¿éËùÔÚĞĞºÅ                                              *
+*             n          - ¿éËùÔÚÁĞºÅ                                              *
+*             blkWidth   - Î»Í¼·Ö¿é¿í¶È                                            *
+*             blkHeight  - Î»Í¼·Ö¿é¸ß¶È                                            *
+*             i          - µ±Ç°¿éÏñËØĞĞºÅ                                          *
+*             j          - µ±Ç°¿éÏñËØÁĞºÅ                                          *
+*   ·µ»ØÖµ£º  LBP                                                				   *
 *                        														   *
 *																				   *
 ***********************************************************************************/
@@ -60,15 +60,15 @@ BYTE PixelLbp(char *image, int width, int height,
 	p  = 8;
 	pi = 3.1415927;
 	lbp = 0;
-	// ä¸­å¿ƒåƒç´ ä½œé˜ˆå€¼
+	// ÖĞĞÄÏñËØ×÷ãĞÖµ
 	coff = (BYTE)image[(blkHeight*n+j)*width*3+(blkWidth*m+i)*3];
-	// ä¸ç¯å½¢åœ†å‘¨ä¸Šçš„8ä¸ªé¢†åŸŸåƒç´ ç‚¹æ¯”è¾ƒï¼Œå¾—äºŒå€¼åºåˆ—ï¼ˆLBPæ¨¡å¼ï¼‰
+	// Óë»·ĞÎÔ²ÖÜÉÏµÄ8¸öÁìÓòÏñËØµã±È½Ï£¬µÃ¶şÖµĞòÁĞ£¨LBPÄ£Ê½£©
 	for ( k=0; k<p; k++ )
 	{
-		// å‡åŒ€åˆ†å¸ƒåœ¨ç¯å½¢åœ†å‘¨ä¸Šçš„åƒç´ ç‚¹åœ¨blockä¸­çš„ä¸‹æ ‡
+		// ¾ùÔÈ·Ö²¼ÔÚ»·ĞÎÔ²ÖÜÉÏµÄÏñËØµãÔÚblockÖĞµÄÏÂ±ê
 		x = (int)(i + r*sin(2*pi*k/p) + 0.5);
 		y = (int)(j - r*cos(2*pi*k/p) + 0.5);
-		// åƒç´ ä¸‹æ ‡ä»blockåæ ‡ç³»è½¬æ¢åˆ°imageåæ ‡ç³»
+		// ÏñËØÏÂ±ê´Óblock×ø±êÏµ×ª»»µ½image×ø±êÏµ
 		x += blkWidth * m;
 		y += blkHeight * n;
 		if ( x < 0 )
@@ -84,7 +84,7 @@ BYTE PixelLbp(char *image, int width, int height,
 			bit = 0;
 		else
 			bit = 1;
-		// æŒ‰é¡ºåºåˆ†é…LBPäºŒå€¼æƒå€¼ï¼Œæœ€åå¾—LBP
+		// °´Ë³Ğò·ÖÅäLBP¶şÖµÈ¨Öµ£¬×îºóµÃLBP
 		lbp |= bit << (p-1-k);
 	} // end for (k)
 	return lbp;
@@ -92,12 +92,12 @@ BYTE PixelLbp(char *image, int width, int height,
 
 /***********************************************************************************
 *																				   *	
-*   å–æ—‹è½¬ä¸å˜æ€§LBPå€¼å‡½æ•°            		                            		   *
-*   åè¿›åˆ¶æ•°å€¼æœ€å°LBPå³ä¸ºæ—‹è½¬ä¸å˜æ€§LBPï¼Œå¾ªç¯ç§»ä½å¾—å½“å‰LBPå„ä¸ªæ¨¡å¼ï¼Œå–æœ€å°å€¼LBP	   *
+*   È¡Ğı×ª²»±äĞÔLBPÖµº¯Êı            		                            		   *
+*   Ê®½øÖÆÊıÖµ×îĞ¡LBP¼´ÎªĞı×ª²»±äĞÔLBP£¬Ñ­»·ÒÆÎ»µÃµ±Ç°LBP¸÷¸öÄ£Ê½£¬È¡×îĞ¡ÖµLBP	   *
 *                                                                                  *
-*   è¾“å…¥å‚æ•°ï¼šlbp  - LBPæ¨¡å¼		                            		           *
-*             n    - æ¨¡å¼äºŒè¿›åˆ¶ä½æ•°ä½å®½                                            *
-*   è¿”å›å€¼ï¼š  æ—‹è½¬ä¸å˜æ€§lbp                                                        *
+*   ÊäÈë²ÎÊı£ºlbp  - LBPÄ£Ê½		                            		           *
+*             n    - Ä£Ê½¶ş½øÖÆÎ»ÊıÎ»¿í                                            *
+*   ·µ»ØÖµ£º  Ğı×ª²»±äĞÔlbp                                                        *
 *												     							   *
 ***********************************************************************************/
 BYTE MinLbp(BYTE lbp, int n)
@@ -106,11 +106,11 @@ BYTE MinLbp(BYTE lbp, int n)
 	BYTE bit;
 	BYTE min;
 
-	// å¾ªç¯ç§»ä½å¾—å½“å‰LBPå„ä¸ªæ¨¡å¼ï¼Œå–æœ€å°å€¼LBP
+	// Ñ­»·ÒÆÎ»µÃµ±Ç°LBP¸÷¸öÄ£Ê½£¬È¡×îĞ¡ÖµLBP
 	min = lbp;
 	for ( i=0; i<n; i++ )
 	{
-		//å¾ªç¯ç§»1ä½
+		//Ñ­»·ÒÆ1Î»
 		bit = lbp & (BYTE)(1 << (n-1));
 		lbp = (lbp << 1) | bit;
 		if ( lbp < min )
@@ -121,10 +121,10 @@ BYTE MinLbp(BYTE lbp, int n)
 
 /***********************************************************************************
 *																				   *
-*	æå–ç°åº¦å›¾åƒçº¹ç†çš„LBPç‰¹å¾å¹¶ç»Ÿè®¡LBPç‰¹å¾ç›´æ–¹å›¾è¡¨å¾äººè„¸å‡½æ•°					   *
+*	ÌáÈ¡»Ò¶ÈÍ¼ÏñÎÆÀíµÄLBPÌØÕ÷²¢Í³¼ÆLBPÌØÕ÷Ö±·½Í¼±íÕ÷ÈËÁ³º¯Êı					   *
 *																				   *
-*   è¾“å…¥å‚æ•°ï¼špImage  - å›¾åƒç»“æ„æŒ‡é’ˆ     		                            	   *
-*   è¾“å‡ºå‚æ•°ï¼šLBP     - LBPç‰¹å¾ç›´æ–¹å›¾                           		           *
+*   ÊäÈë²ÎÊı£ºpImage  - Í¼Ïñ½á¹¹Ö¸Õë     		                            	   *
+*   Êä³ö²ÎÊı£ºLBP     - LBPÌØÕ÷Ö±·½Í¼                           		           *
 *																				   *
 ***********************************************************************************/
 static void ExtractImageLbp(BmpImage *pImage, int *LBP )
@@ -133,7 +133,7 @@ static void ExtractImageLbp(BmpImage *pImage, int *LBP )
 	int n, m, blkCount;
 	int blkWidth, blkHeight;
 	BYTE lbp;
-	int ULBPtable[256];    // uniform LBP ç´¢å¼•æ˜ å°„è¡¨
+	int ULBPtable[256];    // uniform LBP Ë÷ÒıÓ³Éä±í
 	char *tmpImage;
 
 	memset(ULBPtable, -1, sizeof(ULBPtable));
@@ -142,20 +142,20 @@ static void ExtractImageLbp(BmpImage *pImage, int *LBP )
 		int count = 0;
 		for ( j=0; j<7; j++ )
 		{
-			// LBPæ¨¡å¼å¾ªç¯å˜åŒ–0->1 or 1->0æ¬¡æ•°ï¼Œcount<=2: Uniform LBP
+			// LBPÄ£Ê½Ñ­»·±ä»¯0->1 or 1->0´ÎÊı£¬count<=2: Uniform LBP
 			if ( ((i&(1<<j))<<1 ) != (i&(1<<(j+1))) )
 				count++;
 		}
-		// å»ºç«‹æ˜ å°„å…³ç³»
+		// ½¨Á¢Ó³Éä¹ØÏµ
 		if ( count <= 2 )
 			ULBPtable[i] = k++;
 	}
 
 	tmpImage = (char *)malloc(pImage->width*pImage->height*3);
-	// copy imageä¿¡æ¯åˆ°ä¸´æ—¶ç©ºé—´
+	// copy imageĞÅÏ¢µ½ÁÙÊ±¿Õ¼ä
 	memcpy(tmpImage, pImage->data, pImage->width*pImage->height*3);
 	
-	// å›¾åƒåˆ†å—æå–LBPï¼Œ7*& blocks
+	// Í¼Ïñ·Ö¿éÌáÈ¡LBP£¬7*& blocks
 	blkCount = 7;
 	blkWidth = pImage->width / blkCount;
 	blkHeight = pImage->height / blkCount;
@@ -164,24 +164,24 @@ static void ExtractImageLbp(BmpImage *pImage, int *LBP )
 	{
 		for ( m=0; m<blkCount; m++ )
 		{
-			// åˆ†å—æå–LBP
+			// ·Ö¿éÌáÈ¡LBP
 			for ( j=0; j<blkHeight; j++ )
 			{
 				for ( i=0; i<blkWidth; i++ )
 				{
-					// æå–image(blkCount*blkCount)åˆ†å—ä¸­block(m,n)çš„pixel(i,j)çš„LBP
+					// ÌáÈ¡image(blkCount*blkCount)·Ö¿éÖĞblock(m,n)µÄpixel(i,j)µÄLBP
 					lbp = PixelLbp(tmpImage, pImage->width, pImage->height, m, n, blkWidth, blkHeight, i, j);
 					
-					// æ—‹è½¬ä¸å˜æ€§LBP
+					// Ğı×ª²»±äĞÔLBP
 			//		lbp = MinLbp(lbp, 8);
 			
-					// LBPäºŒå€¼åºåˆ—ï¼ˆLBPæ¨¡å¼ï¼‰å¯¹åº”çš„10è¿›åˆ¶æ•°ä½œLBPå€¼
+					// LBP¶şÖµĞòÁĞ£¨LBPÄ£Ê½£©¶ÔÓ¦µÄ10½øÖÆÊı×÷LBPÖµ
 					pImage->data[(blkHeight*n+j)*pImage->width*3+(blkWidth*m+i)*3] = lbp;
 
-					// åˆ†ç±»ç»Ÿè®¡Uniform LBPç›´æ–¹å›¾ï¼Œ58( p*(p-1)+2 )ç§ULBP
+					// ·ÖÀàÍ³¼ÆUniform LBPÖ±·½Í¼£¬58( p*(p-1)+2 )ÖÖULBP
 					if ( ULBPtable[lbp] != -1 )
 						LBP[(n*blkCount+m)*59+ULBPtable[lbp]]++;
-					else // éULBPå½’ä¸º1ç§æ··åˆLBPï¼Œæ··åˆLBPæ”¾æœ€å
+					else // ·ÇULBP¹éÎª1ÖÖ»ìºÏLBP£¬»ìºÏLBP·Å×îºó
 						LBP[(n*blkCount+m)*59+58]++;
 				} // end for (i)
 			} // end for (j)
@@ -189,41 +189,41 @@ static void ExtractImageLbp(BmpImage *pImage, int *LBP )
 		} // end for (m)
 	} // end for (n)
 
-	// é‡Šæ”¾ä¸´æ—¶imageç©ºé—´
+	// ÊÍ·ÅÁÙÊ±image¿Õ¼ä
 	free(tmpImage);
 }
 
 /***********************************************************************************
 *																				   *
-*	å¡æ–¹ç»Ÿè®¡ä¸¤ä¸ªå›¾åƒLBPç›´æ–¹å›¾ç‰¹å¾çš„ç›¸ä¼¼åº¦å‡½æ•°									   *
-*	Ï‡^2 (S,M) = âˆ‘ { (Si-Mi)^2 / (Si+Mi) }										   *
+*	¿¨·½Í³¼ÆÁ½¸öÍ¼ÏñLBPÖ±·½Í¼ÌØÕ÷µÄÏàËÆ¶Èº¯Êı									   *
+*	¦Ö^2 (S,M) = ¡Æ { (Si-Mi)^2 / (Si+Mi) }										   *
 *	     		  																   *
-*   è¾“å…¥å‚æ•°ï¼šdstLBP  - ç›®æ ‡äººè„¸ä½å›¾LBPç‰¹å¾ç›´æ–¹å›¾                            	   *
-*             baseLBP - äººè„¸åº“ä½å›¾LBPç‰¹å¾ç›´æ–¹å›¾                                    *
-*             len     - LBPç‰¹å¾ç›´æ–¹å›¾ç»´åº¦                                          *
-*   è¿”å›å€¼ï¼š  å¡æ–¹å€¼                                            		           *
+*   ÊäÈë²ÎÊı£ºdstLBP  - Ä¿±êÈËÁ³Î»Í¼LBPÌØÕ÷Ö±·½Í¼                            	   *
+*             baseLBP - ÈËÁ³¿âÎ»Í¼LBPÌØÕ÷Ö±·½Í¼                                    *
+*             len     - LBPÌØÕ÷Ö±·½Í¼Î¬¶È                                          *
+*   ·µ»ØÖµ£º  ¿¨·½Öµ                                            		           *
 *	     		 																   *
 ***********************************************************************************/
 static int ChiSquareStatistic(int *dstLBP, int *baseLBP, int len)
 {
 	int i, j;
-	int w[49];  // äººè„¸ä½å›¾åˆ†å—ï¼š7 * 7ï¼Œæ¯å—æƒé‡å€¼
+	int w[49];  // ÈËÁ³Î»Í¼·Ö¿é£º7 * 7£¬Ã¿¿éÈ¨ÖØÖµ
 	double x2;
 
-	// åˆå§‹åŒ–ä¸ºLBPç‰¹å¾ç›´æ–¹å›¾å¡æ–¹ç»Ÿè®¡æ—¶åˆ†é…çš„æƒé‡
+	// ³õÊ¼»¯ÎªLBPÌØÕ÷Ö±·½Í¼¿¨·½Í³¼ÆÊ±·ÖÅäµÄÈ¨ÖØ
 	for ( i=0; i<49; i++ )
 		w[i] = 1;
 		
-	// çœ¼ç›æºå¸¦äººè„¸é‡è¦ä¿¡æ¯ï¼Œåˆ†é…æƒé‡ä¸º4
+	// ÑÛ¾¦Ğ¯´øÈËÁ³ÖØÒªĞÅÏ¢£¬·ÖÅäÈ¨ÖØÎª4
 	w[7*1+1] = w[7*1+2] = w[7*2+1] = w[7*2+2] = 4;
 	w[7*1+4] = w[7*1+5] = w[7*2+4] = w[7*2+5] = 4;
 	
-	// å˜´å’Œé¢å¤´ä¸¤ä¾§æƒé‡ä¸º2
+	// ×ìºÍ¶îÍ·Á½²àÈ¨ÖØÎª2
 	w[7*4+3] = 2;
 	w[0] = w[7*1+0] = 2;
 	w[6] = w[7*1+6] = 2;
 	
-	// é¼»å­å’Œè„¸ä¸‹å·´ä¸¤ä¾§æƒé‡ä¸º0
+	// ±Ç×ÓºÍÁ³ÏÂ°ÍÁ½²àÈ¨ÖØÎª0
 	w[7*2+3] = w[7*3+3] = 0;
 	w[7*3+0] = w[7*4+0] = w[7*5+0] = w[7*6+0] = 0;
 	w[7*3+6] = w[7*4+6] = w[7*5+6] = w[7*6+6] = 0;
@@ -243,11 +243,11 @@ static int ChiSquareStatistic(int *dstLBP, int *baseLBP, int len)
 
 /***********************************************************************************
 *																				   *
-*	åœ¨äººè„¸åº“ä¸­æŸ¥æ‰¾ä¸ç›®æ ‡äººè„¸ä½å›¾LBPç‰¹å¾ç›´æ–¹å›¾ç›¸è¿‘äººè„¸å‡½æ•°						   *
-*	è®¾å®šé˜€å€¼ï¼Œå°äºé˜€å€¼å¯è®¤ä¸ºæ‰¾åˆ°åŒä¸€äººè„¸										   *
+*	ÔÚÈËÁ³¿âÖĞ²éÕÒÓëÄ¿±êÈËÁ³Î»Í¼LBPÌØÕ÷Ö±·½Í¼Ïà½üÈËÁ³º¯Êı						   *
+*	Éè¶¨·§Öµ£¬Ğ¡ÓÚ·§Öµ¿ÉÈÏÎªÕÒµ½Í¬Ò»ÈËÁ³										   *
 *	  																			   *
-*   è¾“å…¥å‚æ•°ï¼šdstLBP      - ç›®æ ‡äººè„¸ä½å›¾LBPç‰¹å¾ç›´æ–¹å›¾                          	   *
-*             facebaseDir - äººè„¸åº“è·¯å¾„                                             *
+*   ÊäÈë²ÎÊı£ºdstLBP      - Ä¿±êÈËÁ³Î»Í¼LBPÌØÕ÷Ö±·½Í¼                          	   *
+*             facebaseDir - ÈËÁ³¿âÂ·¾¶                                             *
 *																				   *
 ***********************************************************************************/
 static bool SearchFace(char *facebaseDir, int *dstLBP)
@@ -258,30 +258,30 @@ static bool SearchFace(char *facebaseDir, int *dstLBP)
 	BmpImage *image, *faceImage;
 	WIN32_FIND_DATA findFileData;
 	HANDLE hFindFile;
-	int LBP[49*59];    // äººè„¸ä½å›¾åˆ†å—ï¼š7 * 7
+	int LBP[49*59];    // ÈËÁ³Î»Í¼·Ö¿é£º7 * 7
 
-	// é€šé…ç¬¦éå†facebaseDirç›®å½•ä¸‹çš„æ‰€ä»¥æ–‡ä»¶ï¼ŒåŒ…æ‹¬ç›®å½•
+	// Í¨Åä·û±éÀúfacebaseDirÄ¿Â¼ÏÂµÄËùÒÔÎÄ¼ş£¬°üÀ¨Ä¿Â¼
 	strcpy(strFilter, facebaseDir);
 	strcat(strFilter, "\\*.*");
 	
-	// è·å–ç›®å½•æŸ¥æ‰¾å¥æŸ„ï¼ŒåŠç¬¬ä¸€ä¸ªæ–‡ä»¶æ•°æ®
+	// »ñÈ¡Ä¿Â¼²éÕÒ¾ä±ú£¬¼°µÚÒ»¸öÎÄ¼şÊı¾İ
 	hFindFile = FindFirstFile(strFilter, &findFileData);
-	// å½“å‰ç›®å½•æ˜¯å¦å­˜åœ¨
+	// µ±Ç°Ä¿Â¼ÊÇ·ñ´æÔÚ
 	if ( hFindFile == INVALID_HANDLE_VALUE )
 		return false;
 
 	do
 	{
-		// å¿½ç•¥ç›®å½•
+		// ºöÂÔÄ¿Â¼
 		if ( findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
 			continue;
 
 		strcpy(findFileName, findFileData.cFileName);
-		// å¿½ç•¥é.bmpæ–‡ä»¶
+		// ºöÂÔ·Ç.bmpÎÄ¼ş
 		if ( strcmp(findFileName+strlen(findFileName)-4, ".bmp" ) != 0 )
 			continue;
 
-		// .bmpæ–‡ä»¶çš„ç»å¯¹è·¯å¾„
+		// .bmpÎÄ¼şµÄ¾ø¶ÔÂ·¾¶
 		strcpy(findFilePath, facebaseDir);
 		strcat(findFilePath, "\\");
 		strcat(findFilePath, findFileName);
@@ -297,13 +297,14 @@ static bool SearchFace(char *facebaseDir, int *dstLBP)
 		}
 		ShowBmpImage(faceImage, 750, 20);
 		
-		// è‰²å½©ç©ºé—´æ¨¡å‹è½¬æ¢
+		// É«²Ê¿Õ¼äÄ£ĞÍ×ª»»
 		RgbToYcbcr(faceImage, faceImage);
 		ExtractImageLbp(faceImage, LBP);
+
 		ShowBmpGreyImage(faceImage, 750, 100);
 
 		int x2;
-		// LBPå¡æ–¹ç»Ÿè®¡ç›¸ä¼¼åº¦é‡å€¼ä¸è®¾å®šé˜ˆå€¼å¯¹æ¯”ï¼Œå°äºé»˜è®¤é˜ˆå€¼æ—¶ï¼Œå›¾åƒç›¸åŒ
+		// LBP¿¨·½Í³¼ÆÏàËÆ¶ÈÁ¿ÖµÓëÉè¶¨ãĞÖµ¶Ô±È£¬Ğ¡ÓÚÄ¬ÈÏãĞÖµÊ±£¬Í¼ÏñÏàÍ¬
 		if ( (x2=ChiSquareStatistic(dstLBP, LBP, 49*59)) < 3000 )
 		{
 			char strx2[50];
@@ -318,7 +319,7 @@ static bool SearchFace(char *facebaseDir, int *dstLBP)
 			return true;
 		}
 		
-		// é‡Šæ”¾ReadBmpFileã€ExtractFaceåŠ¨æ€ç”Ÿæˆçš„ä½å›¾ç©ºé—´
+		// ÊÍ·ÅReadBmpFile¡¢ExtractFace¶¯Ì¬Éú³ÉµÄÎ»Í¼¿Õ¼ä
 		FreeBmpImage(image);
 		FreeBmpImage(faceImage);
 
@@ -337,15 +338,15 @@ static bool SearchFace(char *facebaseDir, int *dstLBP)
 
 /*****************************************************************************************
 *																						 *
-*	åœ¨äººè„¸åº“ä¸­æŸ¥æ‰¾å‡ºç›¸ä¼¼åº¦é‡æ¯”è¾ƒæ¥è¿‘ç›®æ ‡äººè„¸çš„å›¾ç‰‡å‡½æ•°									 *
+*	ÔÚÈËÁ³¿âÖĞ²éÕÒ³öÏàËÆ¶ÈÁ¿±È½Ï½Ó½üÄ¿±êÈËÁ³µÄÍ¼Æ¬º¯Êı									 *
 *																						 *
-*   è¾“å…¥å‚æ•°ï¼špImage       - ç›®æ ‡ä½å›¾ç»“æ„æŒ‡é’ˆ  	                						 *
-*             facebasePath - äººè„¸åº“è·¯å¾„                          						 *
+*   ÊäÈë²ÎÊı£ºpImage       - Ä¿±êÎ»Í¼½á¹¹Ö¸Õë  	                						 *
+*             facebasePath - ÈËÁ³¿âÂ·¾¶                          						 *
 *																						 *
 *****************************************************************************************/
 bool RecognizeFace(BmpImage *pImage, char *facebasePath)
 {
-	int dstLBP[49*59];    // äººè„¸ä½å›¾åˆ†å—ï¼š7 * 7
+	int dstLBP[49*59];    // ÈËÁ³Î»Í¼·Ö¿é£º7 * 7
 	BmpImage *faceImage;
 	
 	faceImage = ExtractFace(pImage);
@@ -354,11 +355,11 @@ bool RecognizeFace(BmpImage *pImage, char *facebasePath)
 	ShowBmpImage(faceImage, 660, 20);
 	
 	RgbToYcbcr(faceImage, faceImage);
+	ExtractImageLbp(faceImage, dstLBP);
+
 	ShowBmpGreyImage(faceImage, 660, 100);
 	
-	ExtractImageLbp(faceImage, dstLBP);
-	
-	// é‡Šæ”¾ExtractFaceåŠ¨æ€ç”Ÿæˆçš„ä½å›¾ç©ºé—´
+	// ÊÍ·ÅExtractFace¶¯Ì¬Éú³ÉµÄÎ»Í¼¿Õ¼ä
 	FreeBmpImage(faceImage);
 
 	return SearchFace(facebasePath, dstLBP);
@@ -366,10 +367,10 @@ bool RecognizeFace(BmpImage *pImage, char *facebasePath)
 
 /*****************************************************************************************
 *																						 *
-*	æ•è·äººè„¸å›¾åƒå…¥åº“å‡½æ•°         														 *
+*	²¶»ñÈËÁ³Í¼ÏñÈë¿âº¯Êı         														 *
 *																						 *
-*   è¾“å…¥å‚æ•°ï¼šimgFileName   - äººè„¸ä½å›¾æ–‡ä»¶å    	               						 *
-*             facebasePath  - äººè„¸åº“ä½å›¾ä½ç½®è·¯å¾„                       					 *
+*   ÊäÈë²ÎÊı£ºimgFileName   - ÈËÁ³Î»Í¼ÎÄ¼şÃû    	               						 *
+*             facebasePath  - ÈËÁ³¿âÎ»Í¼Î»ÖÃÂ·¾¶                       					 *
 *																						 *
 *****************************************************************************************/
 bool EnterFace(char *imgFileName, char *facebasePath)
@@ -380,27 +381,27 @@ bool EnterFace(char *imgFileName, char *facebasePath)
 	HANDLE hFindFile;
 	int count;
 
-	// åˆ›å»ºäººè„¸æ ·æœ¬åº“ç›®å½•
+	// ´´½¨ÈËÁ³Ñù±¾¿âÄ¿Â¼
 	CreateDirectory(facebasePath, NULL);
 
-	// é€šé…ç¬¦éå†facebaseDirç›®å½•ä¸‹çš„æ‰€æœ‰æ–‡ä»¶ï¼ŒåŒ…æ‹¬ç›®å½•
+	// Í¨Åä·û±éÀúfacebaseDirÄ¿Â¼ÏÂµÄËùÓĞÎÄ¼ş£¬°üÀ¨Ä¿Â¼
 	strcpy(strFilter, facebasePath);
 	strcat(strFilter, "\\*.*");
 	
-	// è·å–ç›®å½•æŸ¥æ‰¾å¥æŸ„ï¼ŒåŠç¬¬ä¸€ä¸ªæ–‡ä»¶æ•°æ®
+	// »ñÈ¡Ä¿Â¼²éÕÒ¾ä±ú£¬¼°µÚÒ»¸öÎÄ¼şÊı¾İ
 	hFindFile = FindFirstFile(strFilter, &findFileData);
-	// å½“å‰ç›®å½•æ˜¯å¦å­˜åœ¨
+	// µ±Ç°Ä¿Â¼ÊÇ·ñ´æÔÚ
 	if ( hFindFile == INVALID_HANDLE_VALUE )
 		return false;
 	count = 0;
 	do
 	{
-		// å¿½ç•¥ç›®å½•
+		// ºöÂÔÄ¿Â¼
 		if ( findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
 			continue;
 
 		strcpy(fileName, findFileData.cFileName);
-		// å¿½ç•¥é.bmpæ–‡ä»¶
+		// ºöÂÔ·Ç.bmpÎÄ¼ş
 		if ( strcmp(fileName+strlen(fileName)-4, ".bmp" ) != 0 )
 			continue;
 		
@@ -408,7 +409,7 @@ bool EnterFace(char *imgFileName, char *facebasePath)
 	} while ( FindNextFile(hFindFile, &findFileData) );
 	FindClose(hFindFile);
 
-	// ä»¥åºå·æ„é€ å½•åº“äººè„¸å›¾åƒæ–‡ä»¶å
+	// ÒÔĞòºÅ¹¹ÔìÂ¼¿âÈËÁ³Í¼ÏñÎÄ¼şÃû
 	wsprintf(fileName, "%s%s%d%s", facebasePath, "\\face", count++, ".bmp");
 	if ( CopyFile(imgFileName, fileName, 1) == NULL )
 		return false;
@@ -417,9 +418,9 @@ bool EnterFace(char *imgFileName, char *facebasePath)
 
 /*****************************************************************************************
 *																						 *
-*	é€‰æ‹©åˆ é™¤äººè„¸åº“ä¸­çš„äººè„¸æ ·æœ¬å‡½æ•° 														 *
+*	Ñ¡ÔñÉ¾³ıÈËÁ³¿âÖĞµÄÈËÁ³Ñù±¾º¯Êı 														 *
 *																						 *
-*   è¾“å…¥å‚æ•°ï¼šfacebasePath  - äººè„¸åº“ä½å›¾ä½ç½®è·¯å¾„                       					 *
+*   ÊäÈë²ÎÊı£ºfacebasePath  - ÈËÁ³¿âÎ»Í¼Î»ÖÃÂ·¾¶                       					 *
 *																						 *
 *****************************************************************************************/
 void DeleteFace(char *facebasePath)
@@ -429,7 +430,7 @@ void DeleteFace(char *facebasePath)
 	char selImgFileDir[256];
 	OPENFILENAME ofn;
 	BmpImage *image, *faceImage;
-	int dstLBP[49*59];    // äººè„¸ä½å›¾åˆ†å—ï¼š7 * 7
+	int dstLBP[49*59];    // ÈËÁ³Î»Í¼·Ö¿é£º7 * 7
 
 	memset(&ofn,0,sizeof(ofn));
 	ofn.lStructSize=sizeof(OPENFILENAME);
@@ -444,7 +445,7 @@ void DeleteFace(char *facebasePath)
 	ofn.lpstrFileTitle=fileTitle;
 	ofn.nMaxFileTitle=99;
 	ofn.lpstrInitialDir=facebasePath;
-	ofn.lpstrTitle="é€‰æ‹©è¦ç§»é™¤çš„äººè„¸æ ·æœ¬å›¾åƒ";
+	ofn.lpstrTitle="Ñ¡ÔñÒªÒÆ³ıµÄÈËÁ³Ñù±¾Í¼Ïñ";
 	ofn.Flags=OFN_FILEMUSTEXIST;
 	ofn.lpstrDefExt="raw";
 	ofn.lCustData=NULL;
@@ -453,10 +454,10 @@ void DeleteFace(char *facebasePath)
 	facePath[0]='\0';
 	GetOpenFileName(&ofn); 
 
-	// å–å¾—é€‰æ‹©ç›®æ ‡æ–‡ä»¶å
+	// È¡µÃÑ¡ÔñÄ¿±êÎÄ¼şÃû
 	getcwd(selImgFileDir, MAX_PATH);
 
-	// è·¯å¾„ç©ºæ—¶ï¼Œå–æ¶ˆ
+	// Â·¾¶¿ÕÊ±£¬È¡Ïû
 	if ( !strlen(facePath) )
 		return ;
 
@@ -464,7 +465,7 @@ void DeleteFace(char *facebasePath)
 	if( image == NULL )
 		return ;
 		
-	TextOut(hWinDC, 660, 20, "å·²é€‰æ‹©å¾…ç§»é™¤çš„äººè„¸æ ·æœ¬ï¼š", strlen("å·²é€‰æ‹©å¾…ç§»é™¤çš„äººè„¸æ ·æœ¬ï¼š"));
+	TextOut(hWinDC, 660, 20, "ÒÑÑ¡Ôñ´ıÒÆ³ıµÄÈËÁ³Ñù±¾£º", strlen("ÒÑÑ¡Ôñ´ıÒÆ³ıµÄÈËÁ³Ñù±¾£º"));
 	ShowBmpImage(image, 660, 50);
 	
 	faceImage = ExtractFace(image);
@@ -473,27 +474,27 @@ void DeleteFace(char *facebasePath)
 		FreeBmpImage(image);
 		return ;
 	}
-	ShowBmpImage(faceImage, 730, faceImage->height+80);
+	ShowBmpImage(faceImage, 730, image->height+80);
 	
 	RgbToYcbcr(faceImage, faceImage);
 	ExtractImageLbp(faceImage, dstLBP);
-	ShowBmpGreyImage(faceImage, 850, faceImage->height+80);
+	ShowBmpGreyImage(faceImage, 850, image->height+80);
 
 	if ( strcmp(selImgFileDir, facebasePath) )
 	{
-		MessageBox(hMainWnd, "ç§»é™¤å¤±è´¥ï¼Œé€‰æ‹©çš„ä¸æ˜¯äººè„¸å–æ ·åº“ç›®å½•...\\Facebaseä¸‹çš„å›¾åƒ", "ç§»é™¤äººè„¸æ ·æœ¬", 0);
+		MessageBox(hMainWnd, "ÒÆ³ıÊ§°Ü£¬Ñ¡ÔñµÄ²»ÊÇÈËÁ³È¡Ñù¿âÄ¿Â¼...\\FacebaseÏÂµÄÍ¼Ïñ", "ÒÆ³ıÈËÁ³Ñù±¾", 0);
 		
 		FreeBmpImage(image);
 		FreeBmpImage(faceImage);
 		return ;
 	}
 
-	if ( MessageBox(hMainWnd, "ç¡®å®šç§»é™¤æ‰€é€‰äººè„¸æ ·æœ¬å›¾åƒï¼Ÿ", "ç§»é™¤äººè„¸æ ·æœ¬", MB_OKCANCEL) == IDCANCEL )
+	if ( MessageBox(hMainWnd, "È·¶¨ÒÆ³ıËùÑ¡ÈËÁ³Ñù±¾Í¼Ïñ£¿", "ÒÆ³ıÈËÁ³Ñù±¾", MB_OKCANCEL) == IDOK )
 	{
 		if ( !DeleteFile(facePath) )
-			MessageBox(hMainWnd, "ç§»é™¤ç›®æ ‡äººè„¸æ ·æœ¬å›¾åƒå¤±è´¥ï¼", "ç§»é™¤äººè„¸æ ·æœ¬", 0);
+			MessageBox(hMainWnd, "ÒÆ³ıÄ¿±êÈËÁ³Ñù±¾Í¼ÏñÊ§°Ü£¡", "ÒÆ³ıÈËÁ³Ñù±¾", 0);
 		else
-			MessageBox(hMainWnd, "ç§»é™¤ç›®æ ‡äººè„¸æ ·æœ¬æˆåŠŸï¼", "ç§»é™¤äººè„¸æ ·æœ¬", 0);
+			MessageBox(hMainWnd, "ÒÆ³ıÄ¿±êÈËÁ³Ñù±¾³É¹¦£¡", "ÒÆ³ıÈËÁ³Ñù±¾", 0);
 	}
 	
 	FreeBmpImage(image);

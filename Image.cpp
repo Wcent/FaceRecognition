@@ -28,7 +28,7 @@ BmpImage * MallocBmpImage(int width, int height)
 	BmpImage *pImage;
 	
 	pImage = (BmpImage *)malloc(sizeof(BmpImage));
-	if( Image == NULL)
+	if( pImage == NULL)
 		return NULL;
 		
 	pImage->width  = width;
@@ -57,11 +57,9 @@ void FreeBmpImage(BmpImage *pImage)
 	pImage->width  = 0;
 	pImage->height = 0;
 	
+	// 先释放像素数据内存，再释放位图结构内存
 	free(pImage->data);
-	pImage->data = NULL;
-	
 	free(pImage);
-	pImage = NULL;
 }
 
 /************************************************************************************************
@@ -192,6 +190,9 @@ BmpImage* ReadBmpFile(LPSTR imgFileName)
 	BITMAPINFOHEADER biImage;
 	BmpImage *pImage;
 
+
+	if( strlen(imgFileName) == 0 )
+		return NULL;
 	
 	Image_fp = OpenFile(imgFileName, &of, OF_READ);
 	if (Image_fp == HFILE_ERROR) 
@@ -375,6 +376,8 @@ void NormalizeImageSize( BmpImage *pImage, int width, int height)
 	// 得到位图新尺寸
 	pImage->width = width;
 	pImage->height = height;
-	memcpy(pImage->data, tmpData, width*height*3);
-	free(tmpData);
+
+	// 释放原位图数据，并指向缩放后新的位图数据
+	free(pImage->data);
+	pImage->data = tmpData;
 }

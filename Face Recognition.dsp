@@ -98,6 +98,14 @@ SOURCE=".\Face Recognition.rc"
 # End Source File
 # Begin Source File
 
+SOURCE=.\FaceDetect.cpp
+# End Source File
+# Begin Source File
+
+SOURCE=.\FaceRecognize.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\Image.cpp
 # End Source File
 # Begin Source File
@@ -112,6 +120,14 @@ SOURCE=.\StdAfx.cpp
 # Begin Source File
 
 SOURCE=".\Face Recognition.h"
+# End Source File
+# Begin Source File
+
+SOURCE=.\FaceDetect.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\FaceRecognize.h
 # End Source File
 # Begin Source File
 

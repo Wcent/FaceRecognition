@@ -33,7 +33,7 @@ void FreeBmpImage(BmpImage *pImage);
 void OpenImageFile(char *OPDLTitle, char *pImgFileName);
 
 // 读取bmp图像文件
-BOOL ReadBmpFile(LPSTR imgFileName, BmpImage *oImage);
+BmpImage* ReadBmpFile(LPSTR imgFileName);
 
 // 显示bmp图像
 void ShowBmpImage(BmpImage *pImage, int xPos, int yPos);
