@@ -1,5 +1,7 @@
 // Face Recognition.cpp : Defines the entry point for the application.
-//
+// Copyright: cent
+// 2015.9.17
+// ~
 
 #include "stdafx.h"
 #include "resource.h"
@@ -360,16 +362,17 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 {
 	char imgFileName[256];
 	char facebasePath[256];
-	BmpImage image, faceImage;
+	BmpImage *image, *faceImage;
 
 	strcpy(imgFileName, curDir);
 	strcat(imgFileName, "\\FaceImage.bmp");
 
 	isThreadEnd = false;
-	if ( !ReadBmpFile(imgFileName, &image) )
+	image = ReadBmpFile(imgFileName);
+	if ( image == NULL )
 		// Register a frame callback function with the capture window
 		capSetCallbackOnFrame(hwndCap, FrameCallbackProc);
-//	ShowBmpImage(&Image, 665, 20);
+//	ShowBmpImage(Image, 665, 20);
 
 	if ( isRecognition )
 	{
@@ -377,7 +380,7 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 		strcat(facebasePath, "\\Facebase");
 		
 		// 人脸库中查找目标人脸
-		if ( RecognizeFace(&image, facebasePath) )
+		if ( RecognizeFace(image, facebasePath) )
 		{
 			// disable frame callback function to end entering face
 			capSetCallbackOnFrame(hwndCap, NULL);
@@ -397,17 +400,16 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 	}
 	else // if ( is Recognition == false )
 	{
-		if ( !ExtractFace(&faceImage, &image) )
+		faceImage = ExtractFace(image);
+		if ( faceImage == NULL )
 		{
 			// Register a frame callback function with the capture window
 			capSetCallbackOnFrame(hwndCap, FrameCallbackProc);
 			isThreadEnd = true;
+			FreeBmpImage(image);
 			return 0;
 		}
-
-		// normalize face image to 70 70 size
-		NormalizeImageSize(&faceImage, &image, 70, 70);
-		ShowBmpImage(&faceImage, 770, 200);
+		ShowBmpImage(faceImage, 770, 200);
 
 		int rtn = MessageBox(hMainWnd, "是，则录入人脸样本？否，则捕获新人脸", "Entering Face", MB_YESNOCANCEL);
 		if (  rtn == IDNO )
@@ -436,6 +438,8 @@ DWORD WINAPI RecognitionThreadProc(LPVOID lParam)
 		InvalidateRect(hMainWnd, &rt, true);	
 	}
 
+	FreeBmpImage(image);
+	FreeBmpImage(faceImage);
 	isThreadEnd = true;
 //	MessageBox(NULL, "Leaving Face Recognition Thread", "Thread", NULL);
 	return 0;
@@ -450,7 +454,7 @@ void ChooseImageToRecognizeFace()
 {
 	char imgFileName[256];
 	char path[256];
-	BmpImage image;
+	BmpImage *image;
 	
 	//隐藏视频捕获窗口
 	ShowWindow(hwndCap, SW_HIDE);
@@ -464,18 +468,22 @@ void ChooseImageToRecognizeFace()
 		goto STOP_RECOGNIZING;
 	
 	OpenImageFile("选择搜索目标人脸图像", imgFileName);
-	if ( !strlen(imgFileName) || !ReadBmpFile(imgFileName, &image) )
+	image = ReadBmpFile(imgFileName);
+	if ( !strlen(imgFileName) || image == NULL )
 		goto STOP_RECOGNIZING;
-	ShowBmpImage(&image, 300, 200);
+	ShowBmpImage(image, 300, 200);
 
 	strcpy(path, curDir);
 	strcat(path, "\\Facebase");
 	
 	// 在人脸库中查找目标人脸
-	if ( RecognizeFace(&image, path) )
+	if ( RecognizeFace(image, path) )
 		MessageBox(hMainWnd, "匹配成功！", "人脸识别", 0);
 	else 
 		MessageBox(hMainWnd, "匹配失败！", "人脸识别", 0);
+		
+	// 释放ReadBmpFile动态生成的位图结构
+	FreeBmpImage(image);
 
 STOP_RECOGNIZING:
 	// Update Show window rect
