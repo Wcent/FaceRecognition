@@ -8,6 +8,7 @@
 #include <commdlg.h>
 #include <direct.h>
 #include <math.h>
+#include <stdio.h>
 #include "image.h"
 #include "FaceDetect.h"
 #include "FaceRecognize.h"
@@ -21,7 +22,7 @@
 // 提取灰度图像纹理的LBP特征，统计LBP特征直方图表征人脸
 static void ExtractImageLbp(BmpImage *pImage, int *LBP );
 // 卡方统计两图像LBP相似度
-static int ChiSquareStatistic(int *dstLBP, int *baseLBP, int len);
+static double ChiSquareStatistic(int *dstLBP, int *baseLBP, int len);
 // 查找人脸库中是否存在目标人脸
 static bool SearchFace(char *facebaseDir, int *dstLBP);
 
@@ -30,24 +31,20 @@ static bool SearchFace(char *facebaseDir, int *dstLBP);
 /***********************************************************************************
 *																				   *
 *	提取位图中第(m,n)block中第(i,j)像素点在领域内LBP值函数         			  	   *
-*   取半径为r的环形领域上，圆周上P像素点数计算其Uniform LBP                        *
-*   LBP模式二值序列中0->1或1->0变化次数小于等于2次的为Uniform LBP                  *
+*   取半径为r的环形领域上，圆周上P像素点数计算其局部二值模式lbp值                  *
 *																				   *
-*   输入参数：image      - 位图像素数据		                            		   *
-*             width      - 位图宽度                                                *
-*             height     - 位图高度                                                *
+*   输入参数：pImage     - 指向位图结构指针	                            		   *
 *             m          - 块所在行号                                              *
 *             n          - 块所在列号                                              *
 *             blkWidth   - 位图分块宽度                                            *
 *             blkHeight  - 位图分块高度                                            *
 *             i          - 当前块像素行号                                          *
 *             j          - 当前块像素列号                                          *
-*   返回值：  LBP                                                				   *
+*   返回值：  当前像素点局部二值模式lbp值                          				   *
 *                        														   *
 *																				   *
 ***********************************************************************************/
-BYTE PixelLbp(char *image, int width, int height, 
-              int m, int n, int blkWidth, int blkHeight, int i, int j)
+BYTE PixelLbp(BmpImage *pImage, int m, int n, int blkWidth, int blkHeight, int i, int j)
 {
 	int k;
 	int r, p;
@@ -61,32 +58,37 @@ BYTE PixelLbp(char *image, int width, int height,
 	pi = 3.1415927;
 	lbp = 0;
 	// 中心像素作阈值
-	coff = (BYTE)image[(blkHeight*n+j)*width*3+(blkWidth*m+i)*3];
+	coff = (BYTE)pImage->data[(blkHeight*n+j)*pImage->width*3 + (blkWidth*m+i)*3];
+
 	// 与环形圆周上的8个领域像素点比较，得二值序列（LBP模式）
 	for ( k=0; k<p; k++ )
 	{
 		// 均匀分布在环形圆周上的像素点在block中的下标
 		x = (int)(i + r*sin(2*pi*k/p) + 0.5);
 		y = (int)(j - r*cos(2*pi*k/p) + 0.5);
-		// 像素下标从block坐标系转换到image坐标系
+
+		// 像素下标从block坐标系转换到pImage坐标系
 		x += blkWidth * m;
 		y += blkHeight * n;
 		if ( x < 0 )
 			x = 0;
-		else if ( x >= width )
-			x = width-1;
+		else if ( x >= pImage->width )
+			x = pImage->width-1;
 		if ( y < 0 )
 			y = 0;
-		else if ( y >= height )
-			y = height-1;
-		tmpCoff = (BYTE)image[y*width*3+x*3];
+		else if ( y >= pImage->height )
+			y = pImage->height-1;
+
+		tmpCoff = (BYTE)pImage->data[y*pImage->width*3+x*3];
 		if ( tmpCoff < coff )
 			bit = 0;
 		else
 			bit = 1;
+
 		// 按顺序分配LBP二值权值，最后得LBP
 		lbp |= bit << (p-1-k);
-	} // end for (k)
+	}
+
 	return lbp;
 }
 
@@ -152,13 +154,18 @@ static void ExtractImageLbp(BmpImage *pImage, int *LBP )
 	}
 
 	tmpImage = (char *)malloc(pImage->width*pImage->height*3);
+	if( tmpImage == NULL )
+		return ;
+
 	// copy image信息到临时空间
 	memcpy(tmpImage, pImage->data, pImage->width*pImage->height*3);
 	
-	// 图像分块提取LBP，7*& blocks
+	// 图像分块提取LBP，7*7 blocks
 	blkCount = 7;
 	blkWidth = pImage->width / blkCount;
 	blkHeight = pImage->height / blkCount;
+
+	// 初始化LBP特征直方图统计序列
 	memset(LBP, 0, 59*blkCount*blkCount*sizeof(int));
 	for ( n=0; n<blkCount; n++ )
 	{
@@ -170,27 +177,28 @@ static void ExtractImageLbp(BmpImage *pImage, int *LBP )
 				for ( i=0; i<blkWidth; i++ )
 				{
 					// 提取image(blkCount*blkCount)分块中block(m,n)的pixel(i,j)的LBP
-					lbp = PixelLbp(tmpImage, pImage->width, pImage->height, m, n, blkWidth, blkHeight, i, j);
+					lbp = PixelLbp(pImage, m, n, blkWidth, blkHeight, i, j);
 					
 					// 旋转不变性LBP
-			//		lbp = MinLbp(lbp, 8);
-			
-					// LBP二值序列（LBP模式）对应的10进制数作LBP值
-					pImage->data[(blkHeight*n+j)*pImage->width*3+(blkWidth*m+i)*3] = lbp;
+					lbp = MinLbp(lbp, 8);
 
 					// 分类统计Uniform LBP直方图，58( p*(p-1)+2 )种ULBP
 					if ( ULBPtable[lbp] != -1 )
 						LBP[(n*blkCount+m)*59+ULBPtable[lbp]]++;
 					else // 非ULBP归为1种混合LBP，混合LBP放最后
 						LBP[(n*blkCount+m)*59+58]++;
-				} // end for (i)
+
+					// LBP二值序列（LBP模式）对应的10进制数作LBP值
+					tmpImage[(blkHeight*n+j)*pImage->width*3+(blkWidth*m+i)*3] = lbp;
+				}
 			} // end for (j)
 
 		} // end for (m)
 	} // end for (n)
 
-	// 释放临时image空间
-	free(tmpImage);
+	// 释放位图原始像素，并指向像素lbp数据
+	free(pImage->data);
+	pImage->data = tmpImage;
 }
 
 /***********************************************************************************
@@ -204,7 +212,7 @@ static void ExtractImageLbp(BmpImage *pImage, int *LBP )
 *   返回值：  卡方值                                            		           *
 *	     		 																   *
 ***********************************************************************************/
-static int ChiSquareStatistic(int *dstLBP, int *baseLBP, int len)
+static double ChiSquareStatistic(int *dstLBP, int *baseLBP, int len)
 {
 	int i, j;
 	int w[49];  // 人脸位图分块：7 * 7，每块权重值
@@ -238,7 +246,7 @@ static int ChiSquareStatistic(int *dstLBP, int *baseLBP, int len)
 							   (dstLBP[i*59+j]+baseLBP[i*59+j]);
 		}
 	}
-	return (int)x2;
+	return x2/(49*59);
 }
 
 /***********************************************************************************
@@ -303,13 +311,13 @@ static bool SearchFace(char *facebaseDir, int *dstLBP)
 
 		ShowBmpGreyImage(faceImage, 750, 100);
 
-		int x2;
+		double x2;
 		// LBP卡方统计相似度量值与设定阈值对比，小于默认阈值时，图像相同
-		if ( (x2=ChiSquareStatistic(dstLBP, LBP, 49*59)) < 3000 )
+		if ( (x2=ChiSquareStatistic(dstLBP, LBP, 49*59)) < 0.65 )
 		{
 			char strx2[50];
 			
-			wsprintf(strx2, "%s%d", "x^2 = ", x2);
+			sprintf(strx2, "%s%f", "x^2 = ", x2);
 			TextOut(hWinDC, 700, 180, strx2, strlen(strx2));
 			ShowBmpImage(image, 660, 200);
 			

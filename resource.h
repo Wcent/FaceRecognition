@@ -1,7 +1,7 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Developer Studio generated include file.
 // Used by Face Recognition.rc
-//
+// 
 #define IDC_MYICON                      2
 #define IDD_FACERECOGNITION_DIALOG      102
 #define IDD_ABOUTBOX                    103
